@@ -1,0 +1,144 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Common">
+      <UniqueIdentifier>{a00b60be-c937-45a3-ba4a-77135daf2fea}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Spec">
+      <UniqueIdentifier>{c44e4f82-3701-4b62-b186-f4e4d4f8eeab}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="7z.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="7zAlloc.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="7zBuf.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="7zCrc.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="7zFile.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="7zTypes.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Bcj2.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Bra.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="CpuArch.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Delta.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Lzma2Dec.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="LzmaDec.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Ppmd.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Ppmd7.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Compiler.h">
+      <Filter>Spec</Filter>
+    </ClInclude>
+    <ClInclude Include="DllSecur.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Lzma2DecMt.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="MtDec.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="SwapBytes.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="7zAlloc.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="7zArcIn.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="7zBuf.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="7zCrc.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="7zCrcOpt.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="7zDec.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="7zFile.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="7zStream.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Bcj2.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Bra.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Bra86.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="BraIA64.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="CpuArch.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Delta.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Lzma2Dec.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="LzmaDec.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Ppmd7.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Ppmd7Dec.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="DllSecur.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="LzFindOpt.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Lzma2DecMt.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="MtDec.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Sha256Opt.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="SwapBytes.c">
+      <Filter>Common</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>
