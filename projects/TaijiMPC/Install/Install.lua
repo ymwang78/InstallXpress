@@ -84,8 +84,7 @@ function OnButtonClick(btnName)
         end
     elseif (btnName == "lookprotbtn") then
         if (install.DuiVisible("customlayout")) then
-            install.DuiVisible("customlayout", false)
-            install.DuiWindowPos("_MainFrame", 0, 0, 600, 380)
+            CustomLayeroutHide()
         end
         install.DuiTabSelect("installlayout", 1)
         install.DuiVisible("custombtn", false)
@@ -94,15 +93,7 @@ function OnButtonClick(btnName)
         install.DuiText("portcontent", 133) -- IDR_REGCONTENT1
         install.DuiSetBkImage("mainlayout", "res='130' restype='png' source='20,210,80,216'")
     elseif (btnName == "starinstallbtn") then
-        isAdmin = install.RunAsAdmin()
-        PrepareSetup()
-        if ( not CheckDiskSpace() ) then 
-            return
-        end
-        if (not install.FilePathMkdir(_dirCompany)) then
-            ErrorHint("创建目录失败: " .. _dirCompany)
-            return
-        end
+        StartSetup()
     elseif (btnName == "starusebtn") then
         _FinishInstall()
     end
@@ -116,6 +107,7 @@ end
 
 function ErrorHint(txtError)
     install.DuiText("errortiplab", txtError)
+    install.DuiVisible("errortiplab", true)
 end
 
 function CheckDiskSpace()
@@ -132,11 +124,41 @@ function CheckDiskSpace()
     return true
 end
 
-function PrepareSetup()
+function CustomLayeroutHide()
+    install.DuiVisible("customlayout", false)
+    install.DuiWindowPos("_MainFrame", 0, 0, 600, 380)
+end
+
+function KillProcesses()
     install.ProcessKill("TaiJiMPC.exe")
     install.ProcessKill("TaiJiOPCSim.exe")
     install.ProcessExecute(_dirCompany .. "\\HostVM\\HostVM.exe --stop HostVM")
     install.ProcessKill("HostVM.exe")
+end
+
+function StartSetup()
+    isAdmin = install.RunAsAdmin()
+
+    KillProcesses()
+
+    if ( not CheckDiskSpace() ) then 
+        return
+    end
+
+    if (not install.FilePathMkdir(_dirCompany)) then
+        ErrorHint("创建目录失败: " .. _dirCompany)
+        return
+    end
+
+    CustomLayeroutHide()
+    install.DuiVisible("custombtn", false)
+    install.DuiVisible("errortiplab", false)
+
+    install.DuiEnable("closebtn", false)
+    install.DuiVisible("starinstallbtn", false)
+    install.DuiVisible("sureportlayout", false)
+    install.DuiVisible("installprogress", true)
+
 end
 
 function PostSetup()

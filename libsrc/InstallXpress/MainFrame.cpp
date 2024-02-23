@@ -408,36 +408,7 @@ void CMainFrame::UpdateProcess(int nprocess)
 }
 
 void CMainFrame::InstallSetup()
-{
-	CDirUtility::CreateMulitDir(m_strCompanyDir);
-
-	if (false == CheckDiskSpace(m_strCompanyDir))
-		return;
-
-	if (m_pCustomlayout && m_pCustomlayout->IsVisible())
-	{
-		m_pCustomlayout->SetVisible(false);
-		VisibleCustomRect();
-	}
-	
-	if (m_pCustombtn && m_pTipLabel)
-	{
-		m_pCustombtn->SetVisible(false);
-		//m_pTipLabel->SetVisible(m_bupdate);
-        m_pTipLabel->SetVisible(false);
-	}
-
-	if (m_pCloseBtn) m_pCloseBtn->SetEnabled(false);
-
-	if (m_pStarinstallbtn) {
-		m_pStarinstallbtn->SetVisible(false);
-	}
-	if (m_pProgress) {
-		m_pProgress->SetVisible(true);
-	}
-	CHorizontalLayoutUI* psureportlayout = static_cast<CHorizontalLayoutUI*>(m_PaintManager.FindControl(_T("sureportlayout")));
-	if (psureportlayout) psureportlayout->SetVisible(false);
-	
+{	
 	if (m_pProgress) {
 		SetTimer(this->GetHWND(), WMPROGRESS_TIMER, PORGRESSSHOWSEPLEN, 0);
 	}
