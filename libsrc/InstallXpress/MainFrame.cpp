@@ -250,26 +250,7 @@ void CMainFrame::_OnClickBtn(TNotifyUI &msg)
 {
     m_luaPtr->OnButtonClick(UnicodeToUtf8((LPCTSTR)msg.pSender->GetName()));
 
-	if (_tcsicmp(msg.pSender->GetName(), _T("closebtn")) == 0) 
-	{
-		if (m_pTabLayout && m_pTabLayout->GetCurSel() > 0)
-		{
-			//m_pTabLayout->SelectItem(0);
-			//if (m_pCustombtn) m_pCustombtn->SetVisible(true);
-			//SetTitleText(false);
-			//m_pmainlayout->SetBkImage(_T("res='130' restype='png' source='0,0,600,220' corner='300,208,300,5'"));
-		}
-		else
-		{
-			//if (!m_bFinish)
-			//{
-			//	m_bcloseInstall = true;
-			//	SetEvent(ghEvent);
-			//}
-			//PostMessage(WM_CLOSE, 0, 0);
-		}
-	}
-	else if (_tcsicmp(msg.pSender->GetName(), _T("starinstallbtn")) == 0)
+	if (_tcsicmp(msg.pSender->GetName(), _T("starinstallbtn")) == 0)
 	{
 		InstallSetup();
 	}

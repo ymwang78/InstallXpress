@@ -95,6 +95,8 @@ function OnButtonClick(btnName)
         install.DuiTextColor("titletext", 0xFF3B3B3B)
         install.DuiText("portcontent", 133) -- IDR_REGCONTENT1
         install.DuiSetBkImage("mainlayout", "res='130' restype='png' source='20,210,80,216'")
+    elseif (btnName == "starinstallbtn") then
+        
     elseif (btnName == "starusebtn") then
         _FinishInstall()
     end
