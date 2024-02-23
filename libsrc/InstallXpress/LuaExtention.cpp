@@ -3,7 +3,14 @@
 #include "Utility/TypeConvertUtil.h"
 #include "LuaExtention.h"
 #include <ShlObj_core.h>
-#include <sstream> 
+#include <sstream>
+#include <iostream>
+#include <string>
+#include <sys/stat.h> // For stat().
+#include <sys/types.h> // For mkdir() on Unix/Linux.
+#ifdef _WIN32
+#include <direct.h> // For _mkdir() on Windows.
+#endif
 
 #include "InstallXpress.h"
 
@@ -34,6 +41,50 @@ const HKEY _hRootKeyID[] = {
     HKEY_CURRENT_CONFIG
 };
 
+// 跨平台mkdir函数
+inline int portable_mkdir(const char* path) {
+#ifdef _WIN32
+    return _mkdir(path);
+#else 
+    return mkdir(path, 0755); // 使用Unix/Linux权限模式
+#endif
+}
+
+bool mkdir_p(const std::string& path) {
+    size_t pos = 0;
+    std::string currentPath;
+    std::string delimiter = "/";
+
+#ifdef _WIN32
+    delimiter = "\\";
+#endif
+
+    // 去除路径末尾的分隔符
+    std::string normalizedPath = path;
+    if (normalizedPath.back() == delimiter.back()) {
+        normalizedPath.pop_back();
+    }
+
+    while ((pos = normalizedPath.find(delimiter, pos)) != std::string::npos) {
+        currentPath = normalizedPath.substr(0, pos++);
+        if (currentPath.empty()) continue; // 如果是绝对路径，第一个会是空的
+
+        // 尝试创建目录
+        if (portable_mkdir(currentPath.c_str()) && errno != EEXIST) {
+            //std::cerr << "Error creating directory: " << currentPath << std::endl;
+            return false;
+        }
+    }
+
+    // 创建最后一级目录
+    if (portable_mkdir(normalizedPath.c_str()) && errno != EEXIST) {
+        //std::cerr << "Error creating directory: " << normalizedPath << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
 static INT CALLBACK BrowseCallbackProc(HWND hwnd, UINT uMsg, LPARAM lp, LPARAM pData)
 {
     if (uMsg == BFFM_INITIALIZED) SendMessage(hwnd, BFFM_SETSELECTION, TRUE, pData);
@@ -60,6 +111,8 @@ CDuiString BrowseForFolder(HWND hwnd, CDuiString title, CDuiString folder)
 
     return ret;
 }
+
+
 
 extern "C"
 static int l_DiskFreeSpace(lua_State * L)
@@ -389,6 +442,23 @@ static int l_FilePathChoose(lua_State * L)
 }
 
 extern "C"
+static int l_FilePathMakeDir(lua_State * L)
+{
+    const char* path = luaL_checkstring(L, 1);
+    if (path == nullptr) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+    if (mkdir_p(path)) {
+        lua_pushboolean(L, true);
+        return 1;
+    }
+    lua_pushboolean(L, false);
+    return 1;
+
+}
+
+extern "C"
 static int l_LogPrint(lua_State * L) 
 {
     int top = lua_gettop(L);
@@ -405,6 +475,8 @@ static int l_ProcessExecute(lua_State * L)
     bool hidden = true;
     int wait_sec = -1;
     const char* cmd = luaL_checkstring(L, 1);
+    std::wstring strCommand = Utf82Unicode(cmd);
+
     if (lua_isboolean(L, 2))
         hidden = lua_toboolean(L, 2);
     if (lua_isinteger(L, 3))
@@ -412,7 +484,7 @@ static int l_ProcessExecute(lua_State * L)
 
 #ifdef DEBUG_LUAEXT
     CDuiString log;
-    log.Format(L"%s: %s", "ProcessExecute", cmd);
+    log.Format(L"%s: %s\n", L"ProcessExecute", strCommand.c_str());
     OutputDebugString(log);
 #endif
 
@@ -421,7 +493,7 @@ static int l_ProcessExecute(lua_State * L)
         return 1;
     }
 
-    ExecuteProcess(Utf82Unicode(cmd).c_str(), hidden, wait_sec);
+    ExecuteProcess(strCommand.c_str(), hidden, wait_sec);
     lua_pushboolean(L, true);
     return 1;
 }
@@ -430,12 +502,21 @@ extern "C"
 static int l_ProcessKill(lua_State * L)
 {
     const char* processName = luaL_checkstring(L, 1);
+    std::wstring strProcessName = Utf82Unicode(processName);
 #ifdef DEBUG_LUAEXT
     CDuiString log;
-    log.Format(L"%s: %s", "ProcessKill", processName);
+    log.Format(L"%s: %s\n", L"ProcessKill", strProcessName.c_str());
     OutputDebugString(log);
 #endif
-    BOOL ret = KillProcess(Utf82Unicode(processName).c_str());
+    BOOL ret = KillProcess(strProcessName.c_str());
+    lua_pushboolean(L, ret);
+    return 1;
+}
+
+extern "C"
+static int l_RunAsAdmin(lua_State * L)
+{
+    BOOL ret = TryElevate();
     lua_pushboolean(L, ret);
     return 1;
 }
@@ -814,8 +895,12 @@ static const luaL_Reg reglib[] = {
     {"DuiVisible", l_DuiVisible},
     {"DuiWindowPos", l_DuiWindowPos},
     {"FilePathChoose", l_FilePathChoose},
+    {"FilePathMkdir", l_FilePathMakeDir},
     {"ProcessExecute", l_ProcessExecute},
     {"ProcessKill", l_ProcessKill},
+
+    {"RunAsAdmin", l_RunAsAdmin},
+
     {"GetVersion", l_GetVersion},
     {"GetSpecialFolderLocation", l_GetSpecialFolderLocation},
     {"CreateShortCut", l_CreateShortCut},
@@ -983,12 +1068,6 @@ void InstallLua::ResetInstallPath(const std::string& strInstallPath)
 {
     lua_function<void> func(lua_, "ResetInstallPath");
     func(strInstallPath);
-}
-
-void InstallLua::PreSetup()
-{
-    lua_function<void> func(lua_, "PreSetup");
-    func();
 }
 
 void InstallLua::PostSetup()

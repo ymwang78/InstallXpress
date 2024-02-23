@@ -409,14 +409,6 @@ void CMainFrame::UpdateProcess(int nprocess)
 
 void CMainFrame::InstallSetup()
 {
-    ProcessPrivilege(true);
-	if (m_pInstallEdit) {
-		m_strCompanyDir = m_pInstallEdit->GetText();
-		m_luaPtr->ResetInstallPath(UnicodeToUtf8(m_strCompanyDir.c_str()));
-	}
-
-    m_luaPtr->PreSetup();
-
 	CDirUtility::CreateMulitDir(m_strCompanyDir);
 
 	if (false == CheckDiskSpace(m_strCompanyDir))
@@ -482,30 +474,6 @@ ResourceHandler* CMainFrame::LoadResourceFile(UINT uId, LPCTSTR lpType)
 	}
 	m_resHandlerMap.insert(std::make_pair(uId, handler));
 	return handler;
-}
-
-BOOL CMainFrame::ProcessPrivilege(BOOL bEnable)
-{
-    //WINDOWS提权请求
-
-	BOOL                   bResult = TRUE;
-	HANDLE               hToken = INVALID_HANDLE_VALUE;
-	TOKEN_PRIVILEGES     TokenPrivileges;
-	if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES, &hToken) == 0)
-	{
-		bResult = FALSE;
-	}
-	TokenPrivileges.PrivilegeCount = 1;
-	TokenPrivileges.Privileges[0].Attributes = bEnable ? SE_PRIVILEGE_ENABLED : 0;
-	LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &TokenPrivileges.Privileges[0].Luid);
-	AdjustTokenPrivileges(hToken, FALSE, &TokenPrivileges, sizeof(TOKEN_PRIVILEGES), NULL, NULL);
-	if (GetLastError() != ERROR_SUCCESS)
-	{
-		bResult = FALSE;
-	}
-	CloseHandle(hToken);
-
-	return bResult;
 }
 
 void CMainFrame::SplitStringW(const WCHAR *pSrc, WCHAR chMark, std::vector<std::wstring> &vecStrings, BOOL bOnce)

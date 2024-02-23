@@ -34,7 +34,6 @@ public:
 	bool CheckDiskSpace(const std::wstring &strInstallDir);
 	bool CheckInstallSize();
 	void InstallSetup();
-	BOOL ProcessPrivilege(BOOL bEnable);
 	void InstallZip();
 	void UpdateProcess(int nprocess);
 	void SplitStringW(const WCHAR *pSrc, WCHAR chMark, std::vector<std::wstring> &vecStrings, BOOL bOnce);

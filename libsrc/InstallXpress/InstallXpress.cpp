@@ -33,6 +33,9 @@ BOOL IsRunAsAdmin()
 extern "C"
 BOOL TryElevate()
 {
+    if (IsRunAsAdmin())
+        return TRUE;
+
     WCHAR path[MAX_PATH];
     if (GetModuleFileName(NULL, path, ARRAYSIZE(path)) == 0) {
         return false;

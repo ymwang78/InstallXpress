@@ -37,26 +37,26 @@ local CSIDL_Enum = {
     CSIDL_PROGRAM_FILES             =38,
 };
 
-dirCompany = "C:\\TaijiControl"
-dirExeHomeDir = dirCompany .. "\\TaiJiMPC5"
-dirExeFullPath = dirCompany .. "\\TaiJiMPC5\\TaiJiMPC.exe"
-dirPreCompany = dirCompany
+_dirCompany = "C:\\TaijiControl"
+_dirExeHomeDir = _dirCompany .. "\\TaiJiMPC5"
+_dirExeFullPath = _dirCompany .. "\\TaiJiMPC5\\TaiJiMPC.exe"
+_dirPreCompany = _dirCompany
 
 _bCustomPath = false
 
 function ResetInstallPath(installPath)
-    dirCompany = installPath
-    dirExeHomeDir = dirCompany .. "\\TaiJiMPC5"
-    dirExeFullPath = dirCompany .. "\\TaiJiMPC5\\TaiJiMPC.exe"
+    _dirCompany = installPath
+    _dirExeHomeDir = _dirCompany .. "\\TaiJiMPC5"
+    _dirExeFullPath = _dirCompany .. "\\TaiJiMPC5\\TaiJiMPC.exe"
 end
 
 function OnInitialize()
-    dirCompany = install.RegGetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl", "InstallPath")
-    if (dirCompany == nil or dirCompany == "") then
-        dirCompany = "C:\\TaijiControl"
+    _dirCompany = install.RegGetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl", "InstallPath")
+    if (_dirCompany == nil or _dirCompany == "") then
+        _dirCompany = "C:\\TaijiControl"
     end
-    dirPreCompany = dirCompany
-    ResetInstallPath(dirCompany)
+    _dirPreCompany = _dirCompany
+    ResetInstallPath(_dirCompany)
 end
 
 function OnButtonClick(btnName)
@@ -71,9 +71,7 @@ function OnButtonClick(btnName)
     elseif (btnName == "browfilebtn") then
         installPath = install.FilePathChoose("选择安装目录", "C:\\TaijiControl")
         install.DuiText("pathedit", installPath)
-        --freeSystemSpace = install.DiskFreeSpace("")
-        --freeSpace = install.DiskFreeSpace(installPath)
-        --install.LogPrint(freeSystemSpace, freeSpace)
+        ResetInstallPath(installPath)
     elseif (btnName == "closebtn") then
         if (install.DuiTabSelect("installlayout") > 0) then
             install.DuiTabSelect("installlayout", 0)
@@ -96,7 +94,15 @@ function OnButtonClick(btnName)
         install.DuiText("portcontent", 133) -- IDR_REGCONTENT1
         install.DuiSetBkImage("mainlayout", "res='130' restype='png' source='20,210,80,216'")
     elseif (btnName == "starinstallbtn") then
-        
+        isAdmin = install.RunAsAdmin()
+        PrepareSetup()
+        if ( not CheckDiskSpace() ) then 
+            return
+        end
+        if (not install.FilePathMkdir(_dirCompany)) then
+            ErrorHint("创建目录失败: " .. _dirCompany)
+            return
+        end
     elseif (btnName == "starusebtn") then
         _FinishInstall()
     end
@@ -108,11 +114,28 @@ function OnSelChanged(btnName, isSelected)
     end
 end
 
+function ErrorHint(txtError)
+    install.DuiText("errortiplab", txtError)
+end
 
-function PreSetup()
+function CheckDiskSpace()
+    freeSystemSpace = install.DiskFreeSpace("")
+    if (freeSystemSpace <= 10*1024*1024) then
+        ErrorHint("系统空间不足")
+        return false
+    end
+    freeSpace = install.DiskFreeSpace(_dirCompany)
+    if (freeSpace < 500 * 1024 * 1024) then
+        ErrorHint("磁盘空间不足，需要500M以上空间，请另外选择安装位置")
+        return false
+    end
+    return true
+end
+
+function PrepareSetup()
     install.ProcessKill("TaiJiMPC.exe")
     install.ProcessKill("TaiJiOPCSim.exe")
-    install.ProcessExecute(dirCompany .. "\\HostVM\\HostVM.exe --stop HostVM")
+    install.ProcessExecute(_dirCompany .. "\\HostVM\\HostVM.exe --stop HostVM")
     install.ProcessKill("HostVM.exe")
 end
 
@@ -121,50 +144,50 @@ function PostSetup()
     opcEnum = install.RegGetValue(HRootKey.HKEY_CLASSES_ROOT, "CLSID\\{13486D50-4821-11D2-A494-3CB306C10000}", "")
         or install.RegGetValue(HRootKey.HKEY_CLASSES_ROOT, "WOW6432Node\\CLSID\\{13486D50-4821-11D2-A494-3CB306C10000}", "")
     if (opcEnum == nil or opcEnum == False) then
-        install.ProcessExecute(dirCompany .. "\\Common\\opc\\GBDA_Install_Prereq_x86.msi /quiet")
+        install.ProcessExecute(_dirCompany .. "\\Common\\opc\\GBDA_Install_Prereq_x86.msi /quiet")
     end
 
-    install.ProcessExecute(dirCompany .. "\\TaiJiOPCSim\\bin\\TaiJiOPCSim.exe -RegServer")
+    install.ProcessExecute(_dirCompany .. "\\TaiJiOPCSim\\bin\\TaiJiOPCSim.exe -RegServer")
 
     haspVersion = install.RegGetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Aladdin Knowledge Systems\\HASP\\Driver\\Installer", "DrvPkgVersion")
     if (haspVersion == nil or haspVersion < "8.31") then
         --os.execute
-        install.ProcessExecute(dirCompany .. "\\Common\\hasp\\haspdinst.exe -install -nomsg")
+        install.ProcessExecute(_dirCompany .. "\\Common\\hasp\\haspdinst.exe -install -nomsg")
     end
 
-    install.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl", "InstallPath", dirCompany)
-    install.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\TaiJiMPC5", "APPPath", dirExeFullPath)
+    install.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl", "InstallPath", _dirCompany)
+    install.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\TaiJiMPC5", "APPPath", _dirExeFullPath)
     install.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\TaiJiMPC5", "Version", install.GetVersion())
 
     desktopDir = install.GetSpecialFolderLocation(CSIDL_Enum.CSIDL_COMMON_DESKTOPDIRECTORY)
-    install.CreateShortCut(desktopDir .. "\\TaiJiMPC5.lnk", dirExeFullPath, dirExeHomeDir, "TaiJiMPC5")
+    install.CreateShortCut(desktopDir .. "\\TaiJiMPC5.lnk", _dirExeFullPath, _dirExeHomeDir, "TaiJiMPC5")
 
     startMenuDir = install.GetSpecialFolderLocation(CSIDL_Enum.CSIDL_COMMON_STARTMENU)
     install.CreateDirectory(startMenuDir .. "\\Programs\\TaijiControl")
-    install.CreateShortCut(startMenuDir .. "\\Programs\\TaijiControl\\TaiJiMPC5.lnk", dirExeFullPath, dirExeHomeDir, "TaiJiMPC5")
+    install.CreateShortCut(startMenuDir .. "\\Programs\\TaijiControl\\TaiJiMPC5.lnk", _dirExeFullPath, _dirExeHomeDir, "TaiJiMPC5")
 
-    install.ProcessExecute(dirCompany .. "\\HostVM\\HostVM.exe --install HostVM")
-    install.ProcessExecute(dirCompany .. "\\HostVM\\HostVM.exe --start HostVM")
+    install.ProcessExecute(_dirCompany .. "\\HostVM\\HostVM.exe --install HostVM")
+    install.ProcessExecute(_dirCompany .. "\\HostVM\\HostVM.exe --start HostVM")
 
     UNINST_KEY = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
     install.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "TaiJiMPC5")
     UNINST_KEY = UNINST_KEY .. "\\TaiJiMPC5"
-    install.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayIcon", dirExeFullPath)
+    install.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayIcon", _dirExeFullPath)
     install.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayName", "TaijiMPC5")
     install.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayVersion", install.GetVersion())
     install.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "Publisher", "TaijiSoft")
-    install.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "UninstallString", dirCompany .. "\\TaiJiMPC5\\UnInstall.exe")
+    install.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "UninstallString", _dirCompany .. "\\TaiJiMPC5\\UnInstall.exe")
 end
 
 function _FinishInstall()
     runSelected = install.DuiOptionSelect("runbtn")
     if (runSelected) then
-        install.ProcessExecute(dirExeFullPath, false, 0)
+        install.ProcessExecute(_dirExeFullPath, false, 0)
     end
 
     runOnStartSelected = install.DuiOptionSelect("bootstartbtn")
     if (runOnStartSelected) then
-        install.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", "TaijiMPC", dirExeFullPath)
+        install.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", "TaijiMPC", _dirExeFullPath)
     else
         install.RegDeleteValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", "TaijiMPC")
     end
@@ -179,6 +202,6 @@ end
 
 function QueryByKey(keyName)
     if (keyName == "InstallPath") then
-        return dirCompany
+        return _dirCompany
     end
 end
