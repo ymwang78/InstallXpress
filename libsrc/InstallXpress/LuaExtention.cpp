@@ -110,7 +110,6 @@ static std::string luas_dumpstack(lua_State* L, const char* fname)
     return ss.str();
 }
 
-
 const HKEY _hRootKeyID[] = {
     HKEY_CLASSES_ROOT,
     HKEY_CURRENT_USER,
@@ -123,7 +122,7 @@ extern "C"
 static int l_DuiEnable(lua_State * L)
 {
     const char* ctrlName = luaL_checkstring(L, 1);
-    DuiLib::CControlUI* pControl = static_cast<DuiLib::CControlUI*>(
+    DuiLib::CControlUI* pControl = dynamic_cast<DuiLib::CControlUI*>(
         _pPaintManager == 0 ? 0 : _pPaintManager->FindControl(Utf82Unicode(ctrlName).c_str()));
     if (ctrlName == nullptr || pControl == 0 || _pPaintManager == 0) {
         lua_pushboolean(L, false);
@@ -144,7 +143,7 @@ extern "C"
 static int l_DuiOptionSelect(lua_State* L)
 {
     const char* btnName = luaL_checkstring(L, 1);
-    DuiLib::COptionUI* pOptionUI = static_cast<DuiLib::COptionUI*>(
+    DuiLib::COptionUI* pOptionUI = dynamic_cast<DuiLib::COptionUI*>(
         _pPaintManager == 0 ? 0 : _pPaintManager->FindControl(Utf82Unicode(btnName).c_str()));
     if (btnName == nullptr || pOptionUI == 0 || _pPaintManager == 0) {
         lua_pushboolean(L, false);
@@ -273,7 +272,7 @@ static int l_DuiTextColor(lua_State * L)
         return 1;
     }
     else if (lua_isinteger(L, 2)) {
-        pControl->SetTextColor(lua_tointeger(L, 2));
+        pControl->SetTextColor((DWORD)lua_tointeger(L, 2));
         lua_pushboolean(L, true);
         return 1;
     }
@@ -283,19 +282,25 @@ static int l_DuiTextColor(lua_State * L)
 }
 
 extern "C"
-static int l_DuiSetVisible(lua_State * L)
+static int l_DuiVisible(lua_State * L)
 {
     const char* ctrlName = luaL_checkstring(L, 1);
-    bool bVisible = lua_toboolean(L, 2);
     if (ctrlName == nullptr || _pPaintManager == 0) {
         lua_pushboolean(L, false);
         return 1;
     }
-    DuiLib::CControlUI* pControl = static_cast<DuiLib::CControlUI*>(_pPaintManager->FindControl(Utf82Unicode(ctrlName).c_str()));
+    DuiLib::CControlUI* pControl = dynamic_cast<DuiLib::CControlUI*>(_pPaintManager->FindControl(Utf82Unicode(ctrlName).c_str()));
+
     if (pControl) {
-        pControl->SetVisible(bVisible);
-        lua_pushboolean(L, true);
-        return 1;
+        if (lua_isboolean(L, 2)) {
+            pControl->SetVisible(lua_toboolean(L, 2));
+            lua_pushboolean(L, true);
+            return 1;
+        }
+        else {
+            lua_pushboolean(L, pControl->IsVisible());
+            return 1;
+        }
     }
     lua_pushboolean(L, false);
     return 1;
@@ -331,6 +336,68 @@ static int l_DuiTabSelect(lua_State * L)
         lua_pushinteger(L, pControl->GetCurSel());
         return 1;
     }
+}
+
+extern "C"
+static int l_DuiWindowPos(lua_State * L)
+{
+    const char* ctrlName = luaL_checkstring(L, 1);
+    if (ctrlName == nullptr || _pPaintManager == 0) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+    if (0 == strcmp(ctrlName, "_MainFrame")) {
+        HWND hWnd = _pPaintManager->GetPaintWindow();
+        if (!::IsWindow(hWnd)) {
+            if (lua_isnil(L, 2))
+                lua_pushinteger(L, 0);
+            else
+                lua_pushboolean(L, false);
+            return 1;
+        }
+        if (lua_isnil(L, 2)) {
+            RECT rc{};
+            GetWindowRect(hWnd, &rc);
+            lua_pushinteger(L, rc.left);
+            lua_pushinteger(L, rc.top);
+            lua_pushinteger(L, rc.right - rc.left);
+            lua_pushinteger(L, rc.bottom - rc.top);
+            return 4;
+        }
+        else if (lua_isinteger(L, 2) && lua_isinteger(L, 3) && lua_isinteger(L, 4) && lua_isinteger(L, 5)) {
+            ::SetWindowPos(hWnd, NULL, (LONG)lua_tointeger(L, 2), (LONG)lua_tointeger(L, 3), (LONG)lua_tointeger(L, 4), (LONG)lua_tointeger(L, 5), SWP_NOMOVE | SWP_NOZORDER);
+            lua_pushboolean(L, true);
+            return 1;
+        }
+        lua_pushboolean(L, false);
+        return 1;
+    }
+    else { //not tested
+        DuiLib::CControlUI* pControl = dynamic_cast<DuiLib::CControlUI*>(_pPaintManager->FindControl(Utf82Unicode(ctrlName).c_str()));
+        if (pControl == 0) {
+            if (lua_isnil(L, 2))
+                lua_pushinteger(L, 0);
+            else
+                lua_pushboolean(L, false);
+            return 1;
+        }
+        if (lua_isnil(L, 2)) {
+            const RECT& rc = pControl->GetPos();
+            lua_pushinteger(L, rc.left);
+            lua_pushinteger(L, rc.top);
+            lua_pushinteger(L, rc.right - rc.left);
+            lua_pushinteger(L, rc.bottom - rc.top);
+            return 4;
+        }
+        else if (lua_isinteger(L, 2) && lua_isinteger(L, 3) && lua_isinteger(L, 4) && lua_isinteger(L, 5)) {
+            pControl->SetPos(RECT{ (LONG)lua_tointeger(L, 2), (LONG)lua_tointeger(L, 3), (LONG)lua_tointeger(L, 4), (LONG)lua_tointeger(L, 5) });
+            lua_pushboolean(L, true);
+            return 1;
+        }
+        lua_pushboolean(L, false);
+        return 1;
+    }
+
 }
 
 extern "C"
@@ -752,10 +819,11 @@ static const luaL_Reg reglib[] = {
     {"DuiEnable", l_DuiEnable},
     {"DuiOptionSelect", l_DuiOptionSelect},
     {"DuiSetBkImage", l_DuiSetBkImage},
-    {"DuiSetVisible", l_DuiSetVisible},
     {"DuiTabSelect", l_DuiTabSelect},
     {"DuiText", l_DuiText},
     {"DuiTextColor", l_DuiTextColor},
+    {"DuiVisible", l_DuiVisible},
+    {"DuiWindowPos", l_DuiWindowPos},
     {"ProcessExecute", l_ProcessExecute},
     {"ProcessKill", l_ProcessKill},
     {"GetVersion", l_GetVersion},

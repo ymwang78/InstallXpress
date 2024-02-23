@@ -252,11 +252,11 @@ void CMainFrame::_OnClickBtn(TNotifyUI &msg)
 
 	if (_tcsicmp(msg.pSender->GetName(), _T("custombtn")) == 0)
 	{
-		if (m_pCustomlayout)
-		{
-			m_pCustomlayout->SetVisible(m_bcustom);
+		//if (m_pCustomlayout)
+		//{
+		//	m_pCustomlayout->SetVisible(m_bcustom);
 			VisibleCustomRect();
-		}
+		//}
 	}
 	else if (_tcsicmp(msg.pSender->GetName(), _T("browfilebtn")) == 0)
 	{
@@ -340,6 +340,7 @@ void CMainFrame::_OnSelChanged(TNotifyUI &msg)
 
 void CMainFrame::VisibleCustomRect()
 {
+    return;
 	if (m_bcustom)
 	{
 		SetWindowPos(this->GetHWND(), NULL, 0, 0, m_PaintManager.GetMaxInfo().cx, m_PaintManager.GetMaxInfo().cy, SWP_NOMOVE | SWP_NOZORDER);

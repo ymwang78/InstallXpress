@@ -42,6 +42,8 @@ dirExeHomeDir = dirCompany .. "\\TaiJiMPC5"
 dirExeFullPath = dirCompany .. "\\TaiJiMPC5\\TaiJiMPC.exe"
 dirPreCompany = dirCompany
 
+_bCustomPath = false
+
 function ResetInstallPath(installPath)
     dirCompany = installPath
     dirExeHomeDir = dirCompany .. "\\TaiJiMPC5"
@@ -58,7 +60,15 @@ function OnInitialize()
 end
 
 function OnButtonClick(btnName)
-    if (btnName == "closebtn") then
+    if (btnName == "custombtn") then
+        _bCustomPath = not _bCustomPath
+        install.DuiVisible("customlayout", _bCustomPath)
+        if (_bCustomPath) then
+            install.DuiWindowPos("_MainFrame", 0, 0, 600, 428)
+        else
+            install.DuiWindowPos("_MainFrame", 0, 0, 600, 380)
+        end
+    elseif (btnName == "closebtn") then
         install.DuiText("titletext", "安装程序")
         install.DuiTextColor("titletext", 0xFFFFFFFF)
         install.DuiSetBkImage("mainlayout", "res='130' restype='png' source='0,0,600,220' corner='300,208,300,5'")
