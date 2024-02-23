@@ -296,13 +296,13 @@ static int l_DuiTextColor(lua_State * L)
     }
     DuiLib::CControlUI* pControl = dynamic_cast<DuiLib::CControlUI*>(_pPaintManager->FindControl(Utf82Unicode(ctrlName).c_str()));
     if (pControl == 0) {
-        if (lua_isnil(L, 2))
+        if (lua_isnone(L, 2))
             lua_pushinteger(L, 0);
         else
             lua_pushboolean(L, false);
         return 1;
     }
-    if (lua_isnil(L, 2)) {
+    if (lua_isnone(L, 2)) {
         lua_pushinteger(L, pControl->GetTextColor());
         return 1;
     }
@@ -344,27 +344,20 @@ static int l_DuiVisible(lua_State * L)
 extern "C"
 static int l_DuiTabSelect(lua_State * L)
 {
-    int nSel = -1;
     const char* ctrlName = luaL_checkstring(L, 1);
     if (ctrlName == nullptr || _pPaintManager == 0) {
         lua_pushboolean(L, false);
         return 1;
     }
-    if (lua_isinteger(L, 2)) {
-        nSel = (int)lua_tointeger(L, 2);
-    }
 
     DuiLib::CTabLayoutUI* pControl = dynamic_cast<DuiLib::CTabLayoutUI*>(_pPaintManager->FindControl(Utf82Unicode(ctrlName).c_str()));
     if (pControl == 0) {
-        if (nSel > 0)
-            lua_pushboolean(L, false);
-        else
-            lua_pushinteger(L, 0);
+        lua_pushboolean(L, false);
         return 1;
     }
 
-    if (nSel > 0) {
-        lua_pushboolean(L, pControl->SelectItem(nSel));
+    if (lua_isinteger(L, 2)) {
+        lua_pushboolean(L, pControl->SelectItem((int)lua_tointeger(L, 2)));
         return 1;
     }
     else {
@@ -390,7 +383,7 @@ static int l_DuiWindowPos(lua_State * L)
                 lua_pushboolean(L, false);
             return 1;
         }
-        if (lua_isnil(L, 2)) {
+        if (lua_isnone(L, 2)) {
             RECT rc{};
             GetWindowRect(hWnd, &rc);
             lua_pushinteger(L, rc.left);
@@ -410,13 +403,13 @@ static int l_DuiWindowPos(lua_State * L)
     else { //not tested
         DuiLib::CControlUI* pControl = dynamic_cast<DuiLib::CControlUI*>(_pPaintManager->FindControl(Utf82Unicode(ctrlName).c_str()));
         if (pControl == 0) {
-            if (lua_isnil(L, 2))
+            if (lua_isnone(L, 2))
                 lua_pushinteger(L, 0);
             else
                 lua_pushboolean(L, false);
             return 1;
         }
-        if (lua_isnil(L, 2)) {
+        if (lua_isnone(L, 2)) {
             const RECT& rc = pControl->GetPos();
             lua_pushinteger(L, rc.left);
             lua_pushinteger(L, rc.top);

@@ -75,9 +75,15 @@ function OnButtonClick(btnName)
         --freeSpace = install.DiskFreeSpace(installPath)
         --install.LogPrint(freeSystemSpace, freeSpace)
     elseif (btnName == "closebtn") then
-        install.DuiText("titletext", "安装程序")
-        install.DuiTextColor("titletext", 0xFFFFFFFF)
-        install.DuiSetBkImage("mainlayout", "res='130' restype='png' source='0,0,600,220' corner='300,208,300,5'")
+        if (install.DuiTabSelect("installlayout") > 0) then
+            install.DuiTabSelect("installlayout", 0)
+            install.DuiVisible("custombtn", true)
+            install.DuiText("titletext", "安装程序")
+            install.DuiTextColor("titletext", 0xFFFFFFFF)
+            install.DuiSetBkImage("mainlayout", "res='130' restype='png' source='0,0,600,220' corner='300,208,300,5'")
+        else
+            
+        end
     elseif (btnName == "lookprotbtn") then
         if (install.DuiVisible("customlayout")) then
             install.DuiVisible("customlayout", false)
