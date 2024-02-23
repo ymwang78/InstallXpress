@@ -343,15 +343,17 @@ public:
 
     ~InstallLua();
 
-    void Initialize();
+    void OnInitialize();
+
+    void OnButtonClick(const std::string& strButtonName);
+
+    void OnSelChanged(const std::string& strButtonName, bool isSelected);
 
     void ResetInstallPath(const std::string& strInstallPath);
 
     void PreSetup();
 
     void PostSetup();
-
-    void OnButtonClick(const std::string& strButtonName);
 
     std::string QueryByKey_String(const std::string& keyName);
 

@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include <windows.h>
-#include "TypeConvertUtil.h"
+#include "Utility/TypeConvertUtil.h"
 #include "LuaExtention.h"
 #include <ShlObj_core.h>
 #include <sstream> 
@@ -66,36 +66,34 @@ BOOL FindProcess(const wchar_t* szProcessName)
 }
 
 extern "C"
-void ExecuteHiddenCommand(const wchar_t* cmd)
+DWORD ExecuteProcess(const wchar_t* cmd, bool hidden, int wait_second)
 {
-    STARTUPINFO si;
-    PROCESS_INFORMATION pi;
+    DWORD ret = S_OK;
+    STARTUPINFO si{ sizeof(si) };
+    PROCESS_INFORMATION pi{};
 
-    ZeroMemory(&si, sizeof(si));
-    si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESHOWWINDOW;
-    si.wShowWindow = SW_HIDE;  // 设置窗口隐藏
-
-    ZeroMemory(&pi, sizeof(pi));
-
-    // 创建隐藏的进程
-    if (CreateProcess(NULL,   // 没有模块名（使用命令行）
-        (LPTSTR)cmd,            // 命令行
-        NULL,                  // 进程句柄不可继承
-        NULL,                  // 线程句柄不可继承
-        FALSE,                 // 设置句柄继承为 FALSE
-        CREATE_NO_WINDOW,      // 不创建窗口
-        NULL,                  // 使用父进程的环境块
-        NULL,                  // 使用父进程的启动目录 
-        &si,                   // 指向 STARTUPINFO 的指针
-        &pi)                   // 指向 PROCESS_INFORMATION 的指针
-        )
-    {
-        // 等待直到子进程退出。
-        WaitForSingleObject(pi.hProcess, INFINITE);
-        // 关闭进程和线程句柄
+    if (hidden) {
+        si.dwFlags = STARTF_USESHOWWINDOW;
+        si.wShowWindow = SW_HIDE;
+    }
+    if (CreateProcess(NULL,
+        (LPTSTR)cmd,
+        NULL,
+        NULL,
+        FALSE,
+        hidden ? CREATE_NO_WINDOW : 0,
+        NULL,
+        NULL,
+        &si,
+        &pi)) {
+        if (wait_second)
+            ret = WaitForSingleObject(pi.hProcess, wait_second < 0 ? INFINITE : wait_second * 1000);
         CloseHandle(pi.hProcess);
         CloseHandle(pi.hThread);
+        return ret;
+    }
+    else {
+        return S_FALSE;
     }
 }
 
@@ -122,20 +120,217 @@ const HKEY _hRootKeyID[] = {
 };
 
 extern "C"
-static int l_DuiGetOption(lua_State* L)
+static int l_DuiEnable(lua_State * L)
 {
-    const char* btnName = luaL_checkstring(L, 1);
-    if (btnName == nullptr || _pPaintManager == 0) {
+    const char* ctrlName = luaL_checkstring(L, 1);
+    DuiLib::CControlUI* pControl = static_cast<DuiLib::CControlUI*>(
+        _pPaintManager == 0 ? 0 : _pPaintManager->FindControl(Utf82Unicode(ctrlName).c_str()));
+    if (ctrlName == nullptr || pControl == 0 || _pPaintManager == 0) {
         lua_pushboolean(L, false);
         return 1;
     }
-    DuiLib::COptionUI* pRunPiuPiu = static_cast<DuiLib::COptionUI*>(_pPaintManager->FindControl(Utf82Unicode(btnName).c_str()));
-    if (pRunPiuPiu && pRunPiuPiu->IsSelected()) {
+    if (lua_isboolean(L, 2)) {
+        pControl->SetEnabled(lua_toboolean(L, 2));
+        lua_pushboolean(L, true);
+        return 1;
+    }
+    else {
+        lua_pushboolean(L, pControl->IsEnabled());
+        return 1;
+    }
+}
+
+extern "C"
+static int l_DuiOptionSelect(lua_State* L)
+{
+    const char* btnName = luaL_checkstring(L, 1);
+    DuiLib::COptionUI* pOptionUI = static_cast<DuiLib::COptionUI*>(
+        _pPaintManager == 0 ? 0 : _pPaintManager->FindControl(Utf82Unicode(btnName).c_str()));
+    if (btnName == nullptr || pOptionUI == 0 || _pPaintManager == 0) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+    if (lua_isboolean(L, 2)) {
+        pOptionUI->Selected(lua_toboolean(L, 2));
+        lua_pushboolean(L, true);
+        return 1;
+    }
+    else {
+        lua_pushboolean(L, pOptionUI->IsSelected());
+        return 1;
+    }
+}
+
+extern "C"
+static int l_DuiSetBkImage(lua_State * L)
+{
+    const char* ctrlName = luaL_checkstring(L, 1);
+    const char* imgDesc = luaL_checkstring(L, 2);
+    if (ctrlName == nullptr || imgDesc == nullptr || _pPaintManager == 0) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+    DuiLib::CControlUI* pControl = dynamic_cast<DuiLib::CControlUI*>(_pPaintManager->FindControl(Utf82Unicode(ctrlName).c_str()));
+    if (pControl) {
+        pControl->SetBkImage(Utf82Unicode(imgDesc).c_str());
         lua_pushboolean(L, true);
         return 1;
     }
     lua_pushboolean(L, false);
     return 1;
+}
+
+extern "C"
+static int l_DuiText(lua_State * L)
+{
+    const char* ctrlName = luaL_checkstring(L, 1);
+    if (ctrlName == nullptr || _pPaintManager == 0) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+    DuiLib::CControlUI* pControl = dynamic_cast<DuiLib::CControlUI*>(_pPaintManager->FindControl(Utf82Unicode(ctrlName).c_str()));
+    if (pControl == 0) {
+        if (lua_isnil(L, 2))
+            lua_pushstring(L, "");
+        else
+            lua_pushboolean(L, false);
+        return 1;
+    }
+    if (lua_isnil(L, 2)) {
+        CDuiString text = pControl->GetText();
+        lua_pushstring(L, UnicodeToUtf8(std::wstring(text)).c_str());
+        return 1;
+    }
+    else if (lua_isinteger(L, 2)) {
+        do {
+            int nID = (int)lua_tointeger(L, 2);
+            HRSRC hResource = ::FindResource(_pPaintManager->GetResourceDll(), MAKEINTRESOURCE(nID), _T("REGCONTENT"));
+            if (hResource == NULL)
+                break;
+            DWORD dwSize = 0;
+            HGLOBAL hGlobal = ::LoadResource(_pPaintManager->GetResourceDll(), hResource);
+            if (hGlobal == NULL) {
+#if defined(WIN32) && !defined(UNDER_CE)
+                ::FreeResource(hResource);
+#endif
+                break;
+            }
+            dwSize = ::SizeofResource(_pPaintManager->GetResourceDll(), hResource);
+            if (dwSize == 0) break;
+
+            std::auto_ptr<char> pRegContent(new char[dwSize + 1]);
+            memset(pRegContent.get(), 0, dwSize + 1);
+
+            if (pRegContent.get() != NULL) {
+                ::CopyMemory(pRegContent.get(), (char*)::LockResource(hGlobal), dwSize);
+            }
+#if defined(WIN32) && !defined(UNDER_CE)
+            ::FreeResource(hResource);
+#endif
+            if (pRegContent.get() == NULL) break;
+            string strText(pRegContent.get());
+
+
+            std::wstring wstrContent = CTypeConvertUtil::StringToWstring(strText);
+            pControl->SetText(wstrContent.c_str());
+
+            lua_pushboolean(L, true);
+            return 1;
+
+        } while (0);
+
+        lua_pushboolean(L, 0);
+        return 1;
+    }
+    else if (lua_isstring(L, 2)) {
+        const char* text = luaL_checkstring(L, 2);
+        pControl->SetText(Utf82Unicode(text).c_str());
+        lua_pushboolean(L, true);
+        return 1;
+    }
+    lua_pushboolean(L, false);
+    return 1;
+}
+
+extern "C"
+static int l_DuiTextColor(lua_State * L)
+{
+    const char* ctrlName = luaL_checkstring(L, 1);
+    if (ctrlName == nullptr || _pPaintManager == 0) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+    DuiLib::CControlUI* pControl = dynamic_cast<DuiLib::CControlUI*>(_pPaintManager->FindControl(Utf82Unicode(ctrlName).c_str()));
+    if (pControl == 0) {
+        if (lua_isnil(L, 2))
+            lua_pushinteger(L, 0);
+        else
+            lua_pushboolean(L, false);
+        return 1;
+    }
+    if (lua_isnil(L, 2)) {
+        lua_pushinteger(L, pControl->GetTextColor());
+        return 1;
+    }
+    else if (lua_isinteger(L, 2)) {
+        pControl->SetTextColor(lua_tointeger(L, 2));
+        lua_pushboolean(L, true);
+        return 1;
+    }
+    lua_pushboolean(L, false);
+    return 1;
+
+}
+
+extern "C"
+static int l_DuiSetVisible(lua_State * L)
+{
+    const char* ctrlName = luaL_checkstring(L, 1);
+    bool bVisible = lua_toboolean(L, 2);
+    if (ctrlName == nullptr || _pPaintManager == 0) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+    DuiLib::CControlUI* pControl = static_cast<DuiLib::CControlUI*>(_pPaintManager->FindControl(Utf82Unicode(ctrlName).c_str()));
+    if (pControl) {
+        pControl->SetVisible(bVisible);
+        lua_pushboolean(L, true);
+        return 1;
+    }
+    lua_pushboolean(L, false);
+    return 1;
+}
+
+extern "C"
+static int l_DuiTabSelect(lua_State * L)
+{
+    int nSel = -1;
+    const char* ctrlName = luaL_checkstring(L, 1);
+    if (ctrlName == nullptr || _pPaintManager == 0) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+    if (lua_isinteger(L, 2)) {
+        nSel = (int)lua_tointeger(L, 2);
+    }
+
+    DuiLib::CTabLayoutUI* pControl = dynamic_cast<DuiLib::CTabLayoutUI*>(_pPaintManager->FindControl(Utf82Unicode(ctrlName).c_str()));
+    if (pControl == 0) {
+        if (nSel > 0)
+            lua_pushboolean(L, false);
+        else
+            lua_pushinteger(L, 0);
+        return 1;
+    }
+
+    if (nSel > 0) {
+        lua_pushboolean(L, pControl->SelectItem(nSel));
+        return 1;
+    }
+    else {
+        lua_pushinteger(L, pControl->GetCurSel());
+        return 1;
+    }
 }
 
 extern "C"
@@ -150,13 +345,20 @@ static int l_LogPrint(lua_State * L)
 }
 
 extern "C"
-static int l_RunCommand(lua_State * L) 
+static int l_ProcessExecute(lua_State * L)
 {
+    bool hidden = true;
+    int wait_sec = -1;
     const char* cmd = luaL_checkstring(L, 1);
+    if (lua_isboolean(L, 2))
+        hidden = lua_toboolean(L, 2);
+    if (lua_isinteger(L, 3))
+        wait_sec = (int)lua_tointeger(L, 3);
 
 #ifdef DEBUG_LUAEXT
-    OutputDebugStringA("RunCommand");
-    OutputDebugStringA(cmd);
+    CDuiString log;
+    log.Format(L"%s: %s", "ProcessExecute", cmd);
+    OutputDebugString(log);
 #endif
 
     if (cmd == nullptr) {
@@ -164,46 +366,19 @@ static int l_RunCommand(lua_State * L)
         return 1;
     }
 
-    STARTUPINFOA si = { sizeof(si) };
-    PROCESS_INFORMATION pi;
-    if (!CreateProcessA(NULL, (LPSTR)cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
-        lua_pushboolean(L, false);
-        return 1;
-    }
-
-    CloseHandle(pi.hThread);
-    CloseHandle(pi.hProcess);
+    ExecuteProcess(Utf82Unicode(cmd).c_str(), hidden, wait_sec);
     lua_pushboolean(L, true);
     return 1;
 }
 
 extern "C"
-static int l_RunShell(lua_State * L) 
-{
-    const char* cmd = luaL_checkstring(L, 1);
-
-#ifdef DEBUG_LUAEXT
-    OutputDebugStringA("RunShell");
-    OutputDebugStringA(cmd);
-#endif
-
-    if (cmd == nullptr) {
-        lua_pushboolean(L, false);
-        return 1;
-    }
-
-    ExecuteHiddenCommand(Utf82Unicode(cmd).c_str());
-    lua_pushboolean(L, true);
-    return 1;
-}
-
-extern "C"
-static int l_KillProcess(lua_State * L)
+static int l_ProcessKill(lua_State * L)
 {
     const char* processName = luaL_checkstring(L, 1);
 #ifdef DEBUG_LUAEXT
-    OutputDebugStringA("KillProcess");
-    OutputDebugStringA(processName);
+    CDuiString log;
+    log.Format(L"%s: %s", "ProcessKill", processName);
+    OutputDebugString(log);
 #endif
     BOOL ret = KillProcess(Utf82Unicode(processName).c_str());
     lua_pushboolean(L, ret);
@@ -574,10 +749,15 @@ static int l_RegDeleteKey(lua_State * L)
 }
 
 static const luaL_Reg reglib[] = {
-    {"DuiGetOption", l_DuiGetOption},
-    {"RunCommand", l_RunCommand},
-    {"RunShell", l_RunShell},
-    {"KillProcess", l_KillProcess},
+    {"DuiEnable", l_DuiEnable},
+    {"DuiOptionSelect", l_DuiOptionSelect},
+    {"DuiSetBkImage", l_DuiSetBkImage},
+    {"DuiSetVisible", l_DuiSetVisible},
+    {"DuiTabSelect", l_DuiTabSelect},
+    {"DuiText", l_DuiText},
+    {"DuiTextColor", l_DuiTextColor},
+    {"ProcessExecute", l_ProcessExecute},
+    {"ProcessKill", l_ProcessKill},
     {"GetVersion", l_GetVersion},
     {"GetSpecialFolderLocation", l_GetSpecialFolderLocation},
     {"CreateShortCut", l_CreateShortCut},
@@ -723,10 +903,22 @@ InstallLua::~InstallLua()
 
 }
 
-void InstallLua::Initialize()
+void InstallLua::OnInitialize()
 {
-    lua_function<void> func(lua_, "Initialize");
+    lua_function<void> func(lua_, "OnInitialize");
     func();
+}
+
+void InstallLua::OnButtonClick(const std::string& strButtonName)
+{
+    lua_function<void> func(lua_, "OnButtonClick");
+    func(strButtonName);
+}
+
+void InstallLua::OnSelChanged(const std::string& strButtonName, bool isSelected)
+{
+    lua_function<void> func(lua_, "OnSelChanged");
+    func(strButtonName, isSelected);
 }
 
 void InstallLua::ResetInstallPath(const std::string& strInstallPath)
@@ -747,11 +939,6 @@ void InstallLua::PostSetup()
     func();
 }
 
-void InstallLua::OnButtonClick(const std::string& strButtonName)
-{
-    lua_function<void> func(lua_, "OnButtonClick");
-    func(strButtonName);
-}
 
 std::string InstallLua::QueryByKey_String(const std::string& keyName)
 {

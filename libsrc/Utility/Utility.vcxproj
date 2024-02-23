@@ -178,7 +178,6 @@
     <ClInclude Include="IniOperation.h" />
     <ClInclude Include="log.h" />
     <ClInclude Include="DirUtility.h" />
-    <ClInclude Include="LuaExtention.h" />
     <ClInclude Include="Markup.h" />
     <ClInclude Include="Md5.h" />
     <ClInclude Include="RegOperation.h" />
@@ -217,7 +216,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="LuaExtention.cpp" />
     <ClCompile Include="Markup.cpp" />
     <ClCompile Include="Md5.cpp" />
     <ClCompile Include="RegOperation.cpp" />

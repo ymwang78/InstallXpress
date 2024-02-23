@@ -27,6 +27,9 @@
     <ClCompile Include="InstallXpress.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="LuaExtention.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="7ZLookInStream.h">
@@ -42,6 +45,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="InstallXpress.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="LuaExtention.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

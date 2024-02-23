@@ -31,6 +31,8 @@ public:
     // 文本相关
     virtual CDuiString GetText() const;
     virtual void SetText(LPCTSTR pstrText);
+    virtual DWORD GetTextColor() const { return 0; }
+    virtual void SetTextColor(DWORD dwTextColor) {}
 
     // 图形相关
     DWORD GetBkColor() const;

@@ -6,7 +6,7 @@
 #include "Utility\IniOperation.h"
 #include "UnZip7z.h"
 #include "Utility/log.h"
-#include "Utility\LuaExtention.h"
+#include "LuaExtention.h"
 #include "InstallXpress.h"
 
 #include <ShlObj.h>
@@ -33,7 +33,6 @@ static CMainFrame* _sglMainFrame = 0;
 
 CMainFrame::CMainFrame(InstallXpress_Init_t* init_t)
     : m_pInit(init_t)
-    , m_pTabLayout(NULL)
     , m_pCustomlayout(NULL)
     , m_pCustombtn(NULL)
     , m_bcustom(true)
@@ -42,7 +41,6 @@ CMainFrame::CMainFrame(InstallXpress_Init_t* init_t)
     , m_pCloseBtn(NULL)
     , m_pInstallEdit(NULL)
     , m_pRegText(NULL)
-    , m_pmainlayout(NULL)
     , m_pStarinstallbtn(NULL)
     , m_hThread(NULL)
     , m_pProgress(NULL)
@@ -129,7 +127,7 @@ void CMainFrame::Notify(TNotifyUI& msg)
 	}
 	else if (_tcsicmp(msg.sType, DUI_MSGTYPE_SELECTCHANGED) == 0)
 	{
-		_OnSelChange(msg);
+		_OnSelChanged(msg);
 	}
 }
 
@@ -221,8 +219,15 @@ void CMainFrame::WindowInitialized()
 	}
 	SetIcon(m_pInit->nResourceIDIcon);
 
-	m_pmainlayout = static_cast<CVerticalLayoutUI*>(m_PaintManager.FindControl(_T("mainlayout")));
-	m_pTabLayout = static_cast<CTabLayoutUI*>(m_PaintManager.FindControl(_T("installlayout")));
+    m_luaPtr = new InstallLua(&m_PaintManager, UnicodeToUtf8(DirUtility().Version()));
+#ifdef _DEBUG
+    m_luaPtr->load_file("Install.lua");
+#else
+    ResourceHandler* luaScript = LoadResourceFile(m_pInit->nResourceIDLua, _T("LUA_SCRIPT"));
+    m_luaPtr->load_string((const char*)luaScript->GetData());
+#endif
+    m_luaPtr->OnInitialize();
+
 	m_pCustombtn = static_cast<CButtonUI*>(m_PaintManager.FindControl(_T("custombtn")));
 	m_pCustomlayout = static_cast<CHorizontalLayoutUI*>(m_PaintManager.FindControl(_T("customlayout")));
 	m_pInstallEdit = static_cast<CEditUI*>(m_PaintManager.FindControl(_T("pathedit")));
@@ -231,15 +236,6 @@ void CMainFrame::WindowInitialized()
 	m_pTipLabel = static_cast<CLabelUI*>(m_PaintManager.FindControl(_T("errortiplab")));
 	m_pCloseBtn = static_cast<CButtonUI*>(m_PaintManager.FindControl(_T("closebtn")));
 	m_pProgress = static_cast<CProgressUI*>(m_PaintManager.FindControl(_T("installprogress")));
-
-    m_luaPtr = new InstallLua(&m_PaintManager, UnicodeToUtf8(DirUtility().Version()));
-#ifdef DEBUG
-    m_luaPtr->load_file("Install.lua");
-#else
-    ResourceHandler* luaScript = LoadResourceFile(IDR_LUA_SCRIPT, _T("LUA_SCRIPT"));
-    m_luaPtr->load_string((const char*)luaScript->GetData());
-#endif
-    m_luaPtr->Initialize();
 
 	wchar_t fullHomePath[MAX_PATH] = { 0 };
 	m_strCompanyDir = Utf82Unicode(m_luaPtr->QueryByKey_String("InstallPath"));
@@ -252,6 +248,8 @@ void CMainFrame::WindowInitialized()
 
 void CMainFrame::_OnClickBtn(TNotifyUI &msg)
 {
+    m_luaPtr->OnButtonClick(UnicodeToUtf8((LPCTSTR)msg.pSender->GetName()));
+
 	if (_tcsicmp(msg.pSender->GetName(), _T("custombtn")) == 0)
 	{
 		if (m_pCustomlayout)
@@ -294,13 +292,13 @@ void CMainFrame::_OnClickBtn(TNotifyUI &msg)
 			m_pCustomlayout->SetVisible(false);
 			VisibleCustomRect();
 		}
-		if (m_pTabLayout)
+		//if (m_pTabLayout)
 		{
-			m_pTabLayout->SelectItem(1);
-			if (m_pCustombtn) m_pCustombtn->SetVisible(false);
-			LoadRegRrotocol();
-			SetTitleText(true);
-			m_pmainlayout->SetBkImage(_T("res='130' restype='png' source='20,210,80,216'"));
+			//m_pTabLayout->SelectItem(1);
+			//if (m_pCustombtn) m_pCustombtn->SetVisible(false);
+			//LoadRegRrotocol();
+			//SetTitleText(true);
+			//m_pmainlayout->SetBkImage(_T("res='130' restype='png' source='20,210,80,216'"));
 		}
 	}
 	else if (_tcsicmp(msg.pSender->GetName(), _T("closebtn")) == 0) 
@@ -309,8 +307,8 @@ void CMainFrame::_OnClickBtn(TNotifyUI &msg)
 		{
 			m_pTabLayout->SelectItem(0);
 			if (m_pCustombtn) m_pCustombtn->SetVisible(true);
-			SetTitleText(false);
-			m_pmainlayout->SetBkImage(_T("res='130' restype='png' source='0,0,600,220' corner='300,208,300,5'"));
+			//SetTitleText(false);
+			//m_pmainlayout->SetBkImage(_T("res='130' restype='png' source='0,0,600,220' corner='300,208,300,5'"));
 		}
 		else
 		{
@@ -327,75 +325,17 @@ void CMainFrame::_OnClickBtn(TNotifyUI &msg)
 		InstallSetup();
 	}
 	else if (_tcsicmp(msg.pSender->GetName(), _T("starusebtn")) == 0) {
-		m_luaPtr->OnButtonClick(UnicodeToUtf8((LPCTSTR)msg.pSender->GetName()));
         PostMessage(WM_CLOSE, 0, 0);
 	}
 }
 
-void CMainFrame::_OnSelChange(TNotifyUI &msg)
+void CMainFrame::_OnSelChanged(TNotifyUI &msg)
 {
-	if (_tcsicmp(msg.pSender->GetName(), _T("protcheckbtn")) == 0)
-	{
-		COptionUI* pCheck = static_cast<COptionUI*>(msg.pSender);
-		if (pCheck && m_pStarinstallbtn)
-		{
-			m_pStarinstallbtn->SetEnabled(pCheck->IsSelected());
-		}
-	}
-}
-
-void CMainFrame::SetTitleText(bool bport)
-{
-	CLabelUI* plabel = static_cast<CLabelUI*>(m_PaintManager.FindControl(_T("titletext")));
-	if (NULL == plabel) return;
-
-	CDuiString strTitle = _T("");
-	if (bport) {
-		strTitle = /*PRODUCTNAME*/ _T("安装许可协议");
-		plabel->SetTextColor(0xFF3B3B3B);
-	}
-	else {
-		strTitle = /*PRODUCTNAME*/ _T("安装程序");
-		plabel->SetTextColor(0xFFFFFFFF);
-	}
-	plabel->SetText(strTitle);
-}
-
-void CMainFrame::LoadRegRrotocol()
-{
-    HRSRC hResource = NULL;// ::FindResource(m_PaintManager.GetResourceDll(), MAKEINTRESOURCE(IDR_REGCONTENT1), _T("REGCONTENT"));
-	if (hResource == NULL)
-		return;
-	DWORD dwSize = 0;
-	HGLOBAL hGlobal = ::LoadResource(m_PaintManager.GetResourceDll(), hResource);
-	if (hGlobal == NULL)
-	{
-#if defined(WIN32) && !defined(UNDER_CE)
-		::FreeResource(hResource);
-#endif
-		return;
-	}
-	dwSize = ::SizeofResource(m_PaintManager.GetResourceDll(), hResource);
-	if (dwSize == 0)	return;
-
-	char* pRegContent = new char[dwSize + 1];
-	memset(pRegContent, 0, dwSize + 1);
-
-	if (pRegContent != NULL)
-	{
-		::CopyMemory(pRegContent, (char*)::LockResource(hGlobal), dwSize);
-	}
-#if defined(WIN32) && !defined(UNDER_CE)
-	::FreeResource(hResource);
-#endif
-	if (pRegContent == NULL) return;
-	string strText(pRegContent);
-
-	delete pRegContent;
-	pRegContent = NULL;
-
-	std::wstring wstrContent = CTypeConvertUtil::StringToWstring(strText);
-	m_pRegText->SetText(wstrContent.c_str());
+    COptionUI* pCheck = static_cast<COptionUI*>(msg.pSender);
+    if (pCheck) {
+        m_luaPtr->OnSelChanged(UnicodeToUtf8((LPCTSTR)msg.pSender->GetName()),
+            pCheck->IsSelected());
+    }
 }
 
 void CMainFrame::VisibleCustomRect()

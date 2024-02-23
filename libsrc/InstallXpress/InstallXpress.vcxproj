@@ -21,12 +21,14 @@
   <ItemGroup>
     <ClCompile Include="7ZLookInStream.cpp" />
     <ClCompile Include="InstallXpress.cpp" />
+    <ClCompile Include="LuaExtention.cpp" />
     <ClCompile Include="MainFrame.cpp" />
     <ClCompile Include="UnZip7z.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="7ZLookInStream.h" />
     <ClInclude Include="InstallXpress.h" />
+    <ClInclude Include="LuaExtention.h" />
     <ClInclude Include="MainFrame.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="UnZip7z.h" />

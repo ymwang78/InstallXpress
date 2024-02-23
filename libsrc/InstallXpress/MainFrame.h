@@ -29,11 +29,9 @@ public:
 public:
 	void WindowInitialized();
 	void _OnClickBtn(TNotifyUI &msg);
-	void _OnSelChange(TNotifyUI &msg);
+	void _OnSelChanged(TNotifyUI &msg);
 	void VisibleCustomRect();
 	bool CheckDiskSpace(const std::wstring &strInstallDir);
-	void SetTitleText(bool bport);
-	void LoadRegRrotocol();
 	bool CheckInstallSize();
 	void InstallSetup();
 	BOOL ProcessPrivilege(BOOL bEnable);

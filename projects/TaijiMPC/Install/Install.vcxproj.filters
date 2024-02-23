@@ -56,11 +56,13 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Install.lua" />
-  </ItemGroup>
-  <ItemGroup>
     <Xml Include="res\InstallDialog.xml">
       <Filter>Resource Files</Filter>
     </Xml>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Install.lua">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

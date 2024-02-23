@@ -17,7 +17,7 @@ extern "C"
 #include "7Z/7zVersion.h"
 }
 
-extern "C" void ExecuteHiddenCommand(const wchar_t* cmd);
+extern "C" void ExecuteProcess(const wchar_t* cmd, bool hidden, int wait_second);
 
 CUnZip7z::CUnZip7z()
 {
@@ -235,7 +235,7 @@ int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, std::wstring &mUnPackPa
                             //delCommand.Format(L"del /f /s /q %s", szFile);
                             //_wsystem(delCommand);
 							delCommand.Format(L"cmd /c del /F /Q %s", szFile);
-							ExecuteHiddenCommand(delCommand);
+                            ExecuteProcess(delCommand, true, -1);
 							dLastError = OutFile_OpenW(&outFile, szFile);
 						}
 						if (dLastError) {
