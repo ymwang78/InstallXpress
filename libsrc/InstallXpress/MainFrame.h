@@ -3,11 +3,12 @@
 #include <Utility/DirUtility.h>
 #include <Utility/ResourceHandler.h>
 class InstallLua;
+struct InstallXpress_Init_t;
 
 class CMainFrame final : public WindowImplBase
 {
 public:
-	CMainFrame(bool bUpdate);
+	CMainFrame(InstallXpress_Init_t* init_t);
 	~CMainFrame();
 	static CMainFrame* GetInstance();
 
@@ -48,7 +49,8 @@ public:
 	CPaintManagerUI& PaintManager() { return m_PaintManager; }
 
 private: 
-	bool m_bupdate;
+    InstallXpress_Init_t* m_pInit;
+	//bool m_bupdate;
 	bool m_bcustom;
 	bool m_bFinish;
 	bool m_bcloseInstall;

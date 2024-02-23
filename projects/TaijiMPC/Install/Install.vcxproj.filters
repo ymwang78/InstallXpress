@@ -30,30 +30,12 @@
     <ClInclude Include="Install.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="MainFrame.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="UnZip7z.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="7ZLookInStream.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Install.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="MainFrame.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="UnZip7z.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="7ZLookInStream.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -75,7 +57,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Install.lua" />
-    <None Include="..\..\bin\Win32\Install.7z" />
   </ItemGroup>
   <ItemGroup>
     <Xml Include="res\InstallDialog.xml">

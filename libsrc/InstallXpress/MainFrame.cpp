@@ -1,6 +1,5 @@
 ﻿#include "stdafx.h"
 #include "MainFrame.h"
-#include "resource.h"
 #include "Utility\DirUtility.h"
 #include "Utility\RegOperation.h"
 #include "Utility\TypeConvertUtil.h"
@@ -8,6 +7,7 @@
 #include "UnZip7z.h"
 #include "Utility/log.h"
 #include "Utility\LuaExtention.h"
+#include "InstallXpress.h"
 
 #include <ShlObj.h>
 #include <process.h>
@@ -31,26 +31,26 @@
 HANDLE ghEvent = NULL; //全局变量;
 static CMainFrame* _sglMainFrame = 0;
 
-CMainFrame::CMainFrame(bool bUpdate)
-	: m_bupdate(bUpdate)
-	, m_pTabLayout(NULL)
-	, m_pCustomlayout(NULL)
-	, m_pCustombtn(NULL)
-	, m_bcustom(true)
-	, m_bFinish(false)
-	, m_bcloseInstall(false)
-	, m_pCloseBtn(false)
-	, m_pInstallEdit(NULL)
-	, m_pRegText(NULL)
-	, m_pmainlayout(NULL)
-	, m_pStarinstallbtn(NULL)
-	, m_hThread(NULL)
-	, m_pProgress(NULL)
-	, m_nZipFileNum(0)
-	, m_nProcess(35)
-	, m_nOldProcess(35)
-	, m_dirUtility()
-	, m_luaPtr(0)
+CMainFrame::CMainFrame(InstallXpress_Init_t* init_t)
+    : m_pInit(init_t)
+    , m_pTabLayout(NULL)
+    , m_pCustomlayout(NULL)
+    , m_pCustombtn(NULL)
+    , m_bcustom(true)
+    , m_bFinish(false)
+    , m_bcloseInstall(false)
+    , m_pCloseBtn(NULL)
+    , m_pInstallEdit(NULL)
+    , m_pRegText(NULL)
+    , m_pmainlayout(NULL)
+    , m_pStarinstallbtn(NULL)
+    , m_hThread(NULL)
+    , m_pProgress(NULL)
+    , m_nZipFileNum(0)
+    , m_nProcess(35)
+    , m_nOldProcess(35)
+    , m_dirUtility()
+    , m_luaPtr(0)
 {
     _sglMainFrame = this;
 	m_strCompanyDir = _T("");
@@ -74,7 +74,7 @@ void CMainFrame::InitWindow()
 
 LPCTSTR CMainFrame::GetWindowClassName(void) const
 {
-	return _T("MainFrameSetup");
+	return _T("InstallXpressMainFrame");
 }
 
 UILIB_RESOURCETYPE CMainFrame::GetResourceType() const
@@ -84,9 +84,7 @@ UILIB_RESOURCETYPE CMainFrame::GetResourceType() const
 
 CDuiString CMainFrame::GetSkinFile()
 {
-	TCHAR szBuf[MAX_PATH] = { 0 };
-	_stprintf_s(szBuf, MAX_PATH - 1, _T("%d"), IDR_MAIN_XML);
-	return szBuf;
+    return CDuiString(m_pInit->szSkinXML);
 }
 
 CDuiString CMainFrame::GetSkinFolder()
@@ -221,7 +219,7 @@ void CMainFrame::WindowInitialized()
 		//开启线程检测安装大小;
 		m_hThread = (HANDLE)_beginthreadex(NULL, 0, &CMainFrame::InstallThread, this, 0, NULL);
 	}
-	SetIcon(IDI_INSTALL);
+	SetIcon(m_pInit->nResourceIDIcon);
 
 	m_pmainlayout = static_cast<CVerticalLayoutUI*>(m_PaintManager.FindControl(_T("mainlayout")));
 	m_pTabLayout = static_cast<CTabLayoutUI*>(m_PaintManager.FindControl(_T("installlayout")));
@@ -249,7 +247,7 @@ void CMainFrame::WindowInitialized()
 	m_strCompanyDir = fullHomePath;	
 	if (m_pInstallEdit) m_pInstallEdit->SetText(m_strCompanyDir.c_str());
 
-	if (m_bupdate) InstallSetup(); //更新直接安装;
+	//if (m_bupdate) InstallSetup(); //更新直接安装;
 }
 
 void CMainFrame::_OnClickBtn(TNotifyUI &msg)
@@ -279,7 +277,7 @@ void CMainFrame::_OnClickBtn(TNotifyUI &msg)
 		if (m_pInstallEdit)
 		{
 			std::wstring str(szBuffer);
-			str.append(L"\\" COMPANYNAME);
+			//str.append(L"\\" COMPANYNAME);
 
 			TCHAR fullHomePath[MAX_PATH] = { 0 };
             _tfullpath(fullHomePath + _tcslen(fullHomePath), str.c_str(), sizeof(fullHomePath) / sizeof(fullHomePath[0]));
@@ -353,11 +351,11 @@ void CMainFrame::SetTitleText(bool bport)
 
 	CDuiString strTitle = _T("");
 	if (bport) {
-		strTitle = PRODUCTNAME _T("安装许可协议");
+		strTitle = /*PRODUCTNAME*/ _T("安装许可协议");
 		plabel->SetTextColor(0xFF3B3B3B);
 	}
 	else {
-		strTitle = PRODUCTNAME _T("安装程序");
+		strTitle = /*PRODUCTNAME*/ _T("安装程序");
 		plabel->SetTextColor(0xFFFFFFFF);
 	}
 	plabel->SetText(strTitle);
@@ -365,7 +363,7 @@ void CMainFrame::SetTitleText(bool bport)
 
 void CMainFrame::LoadRegRrotocol()
 {
-	HRSRC hResource = ::FindResource(m_PaintManager.GetResourceDll(), MAKEINTRESOURCE(IDR_REGCONTENT1), _T("REGCONTENT"));
+    HRSRC hResource = NULL;// ::FindResource(m_PaintManager.GetResourceDll(), MAKEINTRESOURCE(IDR_REGCONTENT1), _T("REGCONTENT"));
 	if (hResource == NULL)
 		return;
 	DWORD dwSize = 0;
@@ -479,13 +477,14 @@ void CMainFrame::InstallZip()
 {
 	bool bInstallPiu = true;
 	bool bNewInstall = false;
-	if (!m_bupdate)
-		m_pProgress->SetText(_T("正在安装18%..."));
-	else
-		m_pProgress->SetText(_T("正在更新18%..."));
+	//if (!m_bupdate)
+	//	m_pProgress->SetText(_T("正在安装18%..."));
+	//else
+	//	m_pProgress->SetText(_T("正在更新18%..."));
+    m_pProgress->SetText(_T("正在安装18%..."));
 	m_pProgress->SetValue(m_nProcess);
 
-	UINT uId[] = { IDR_INSTALLSOFT1 };
+    UINT uId[] = {134};// { IDR_INSTALLSOFT1 };
     bool bInstallFinish = true;
 	////////////////////////////////////	
 	for (unsigned i = 0; i < sizeof(uId) / sizeof(uId[0]); ++i) {
@@ -507,7 +506,7 @@ void CMainFrame::InstallZip()
 		bInstallFinish = true;
 	}
 	else {
-		CDuiString str = m_bupdate ? _T("更新失败") : _T("安装失败");
+		CDuiString str =/* m_bupdate ? _T("更新失败") :*/ _T("安装失败");
 		if (bNewInstall) {
 			if (m_pTipLabel) m_pTipLabel->SetText(str.GetData());
 		}
@@ -528,10 +527,11 @@ void CMainFrame::UpdateProcess(int nprocess)
 	m_pProgress->SetValue(m_nProcess);
 
 	CDuiString str;
-	if (!m_bupdate)
-		str.Format(_T("正在安装%d%%"), m_nProcess);
-	else
-		str.Format(_T("正在更新%d%%"), m_nProcess);
+	//if (!m_bupdate)
+	//	str.Format(_T("正在安装%d%%"), m_nProcess);
+	//else
+	//	str.Format(_T("正在更新%d%%"), m_nProcess);
+    str.Format(_T("正在安装%d%%"), m_nProcess);
 	m_pProgress->SetText(str.GetData());
 	m_nOldProcess = nprocess;
 }
@@ -560,7 +560,8 @@ void CMainFrame::InstallSetup()
 	if (m_pCustombtn && m_pTipLabel)
 	{
 		m_pCustombtn->SetVisible(false);
-		m_pTipLabel->SetVisible(m_bupdate);
+		//m_pTipLabel->SetVisible(m_bupdate);
+        m_pTipLabel->SetVisible(false);
 	}
 
 	if (m_pCloseBtn) m_pCloseBtn->SetEnabled(false);
@@ -582,7 +583,7 @@ void CMainFrame::InstallSetup()
 bool CMainFrame::CheckInstallSize()
 {
 	////////////////////////检测站点包大小/////////////////////;
-	UINT uId[] = { IDR_INSTALLSOFT1 };
+    UINT uId[] = { 134 };// { IDR_INSTALLSOFT1 };
 	for (unsigned i = 0; i < sizeof(uId) / sizeof(uId[0]); ++i) {
         ResourceHandler* pInstallContent = LoadResourceFile(uId[i], _T("INSTALLSOFT"));
         if (pInstallContent == NULL)

@@ -11,7 +11,7 @@ CTypeConvertUtil::~CTypeConvertUtil()
 {
 }
 
-wstring CTypeConvertUtil::Utf82Unicode(const string& str)
+wstring CTypeConvertUtil::UTF82Unicode(const string& str)
 {
 	int  len = 0;
 	len = str.length();

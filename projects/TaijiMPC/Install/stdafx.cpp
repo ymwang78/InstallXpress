@@ -10,6 +10,7 @@
 #pragma comment(lib, "Utility.lib")
 #pragma  comment(lib, "lib7z.lib")
 #pragma  comment(lib, "liblua.lib")
+#pragma  comment(lib, "InstallXpress.lib")
 #if SUPPORT_WEBP
 #pragma comment(lib, "libwebp.lib")
 #endif

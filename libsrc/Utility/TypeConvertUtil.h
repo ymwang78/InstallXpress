@@ -14,7 +14,7 @@
 #define Utf8ToAnsi(str)		CTypeConvertUtil::ConvertUTF8ToANSI(str)
 #define AnsiToUtf8(str)		CTypeConvertUtil::ConvertANSIToUTF8(str)
 #define UnicodeToUtf8(str)  CTypeConvertUtil::UnicodeToUTF8(str)
-#define Utf82Unicode(str)  CTypeConvertUtil::Utf82Unicode(str)
+#define Utf82Unicode(str)   CTypeConvertUtil::UTF82Unicode(str)
 
 #include <string>
 using namespace std;
@@ -27,7 +27,7 @@ public:
 	
 public:	
 	static string  UnicodeToUTF8(const wstring& str);						
-	static wstring Utf82Unicode(const string& str);
+	static wstring UTF82Unicode(const string& str);
 	static void ConvertUTF8ToANSI(string &strUTF8);							// UTF8תasci;	
 	static void ConvertANSIToUTF8(string& strANSI);							// asciתUTF8;
 	static std::wstring StringToWstring(const std::string& strInput );		// stringתwstring;
