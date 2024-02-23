@@ -250,58 +250,7 @@ void CMainFrame::_OnClickBtn(TNotifyUI &msg)
 {
     m_luaPtr->OnButtonClick(UnicodeToUtf8((LPCTSTR)msg.pSender->GetName()));
 
-	if (_tcsicmp(msg.pSender->GetName(), _T("custombtn")) == 0)
-	{
-		//if (m_pCustomlayout)
-		//{
-		//	m_pCustomlayout->SetVisible(m_bcustom);
-			VisibleCustomRect();
-		//}
-	}
-	else if (_tcsicmp(msg.pSender->GetName(), _T("browfilebtn")) == 0)
-	{
-		TCHAR szBuffer[MAX_PATH] = { 0 };
-		BROWSEINFO bi;
-		ZeroMemory(&bi, sizeof(BROWSEINFO));
-		bi.hwndOwner = NULL;
-		bi.pszDisplayName = szBuffer;
-		bi.lpszTitle = _T("从下面选文件夹目录:");
-		bi.ulFlags = BIF_RETURNFSANCESTORS;
-		LPITEMIDLIST idl = SHBrowseForFolder(&bi);
-		if (NULL == idl)
-			return;
-		SHGetPathFromIDList(idl, szBuffer);
-
-		if (m_pInstallEdit)
-		{
-			std::wstring str(szBuffer);
-			//str.append(L"\\" COMPANYNAME);
-
-			TCHAR fullHomePath[MAX_PATH] = { 0 };
-            _tfullpath(fullHomePath + _tcslen(fullHomePath), str.c_str(), sizeof(fullHomePath) / sizeof(fullHomePath[0]));
-			str = fullHomePath;
-
-			m_pInstallEdit->SetText(str.c_str());
-			CheckDiskSpace(str);
-		}
-	}
-	else if (_tcsicmp(msg.pSender->GetName(), _T("lookprotbtn")) == 0)
-	{
-		if (m_pCustomlayout && m_pCustomlayout->IsVisible())
-		{
-			m_pCustomlayout->SetVisible(false);
-			VisibleCustomRect();
-		}
-		//if (m_pTabLayout)
-		{
-			//m_pTabLayout->SelectItem(1);
-			//if (m_pCustombtn) m_pCustombtn->SetVisible(false);
-			//LoadRegRrotocol();
-			//SetTitleText(true);
-			//m_pmainlayout->SetBkImage(_T("res='130' restype='png' source='20,210,80,216'"));
-		}
-	}
-	else if (_tcsicmp(msg.pSender->GetName(), _T("closebtn")) == 0) 
+	if (_tcsicmp(msg.pSender->GetName(), _T("closebtn")) == 0) 
 	{
 		if (m_pTabLayout && m_pTabLayout->GetCurSel() > 0)
 		{

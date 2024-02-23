@@ -119,6 +119,41 @@ const HKEY _hRootKeyID[] = {
 };
 
 extern "C"
+static int l_DiskFreeSpace(lua_State * L)
+{
+    const char* path = luaL_checkstring(L, 1);
+    if (path == nullptr) {
+        lua_pushnil(L);
+        return 1;
+    }
+    ULARGE_INTEGER freeBytesAvailable;
+    ULARGE_INTEGER totalNumberOfBytes;
+    ULARGE_INTEGER totalNumberOfFreeBytes;
+
+    if (path[0] == 0) {
+        TCHAR str[MAX_PATH] = { 0 };
+        GetSystemDirectory(str, MAX_PATH);
+        if (GetDiskFreeSpaceEx(str, &freeBytesAvailable, &totalNumberOfBytes, &totalNumberOfFreeBytes)) {
+            lua_pushinteger(L, freeBytesAvailable.QuadPart);
+            //lua_pushinteger(L, totalNumberOfBytes.QuadPart);
+            //lua_pushinteger(L, totalNumberOfFreeBytes.QuadPart);
+            return 1;
+        }
+    }
+    else {
+        if (GetDiskFreeSpaceEx(Utf82Unicode(path).c_str(), &freeBytesAvailable, &totalNumberOfBytes, &totalNumberOfFreeBytes)) {
+            lua_pushinteger(L, freeBytesAvailable.QuadPart);
+            //lua_pushinteger(L, totalNumberOfBytes.QuadPart);
+            //lua_pushinteger(L, totalNumberOfFreeBytes.QuadPart);
+            return 1;
+        }
+    }
+    lua_pushnil(L);
+    return 1;
+
+}
+
+extern "C"
 static int l_DuiEnable(lua_State * L)
 {
     const char* ctrlName = luaL_checkstring(L, 1);
@@ -397,7 +432,50 @@ static int l_DuiWindowPos(lua_State * L)
         lua_pushboolean(L, false);
         return 1;
     }
+}
 
+INT CALLBACK BrowseCallbackProc(HWND hwnd, UINT uMsg, LPARAM lp, LPARAM pData)
+{
+    if (uMsg == BFFM_INITIALIZED) SendMessage(hwnd, BFFM_SETSELECTION, TRUE, pData);
+    return 0;
+}
+
+CDuiString BrowseForFolder(HWND hwnd, CDuiString title, CDuiString folder)
+{
+    CDuiString ret;
+
+    BROWSEINFO br;
+    ZeroMemory(&br, sizeof(BROWSEINFO));
+    br.lpfn = BrowseCallbackProc;
+    br.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
+    br.hwndOwner = hwnd;
+    br.lpszTitle = title;
+    br.lParam = (LPARAM)(LPCTSTR)folder;
+
+    LPITEMIDLIST pidl = NULL;
+    if ((pidl = SHBrowseForFolder(&br)) != NULL) {
+        wchar_t buffer[MAX_PATH];
+        if (SHGetPathFromIDList(pidl, buffer)) ret = buffer;
+    }
+
+    return ret;
+}
+
+extern "C"
+static int l_FilePathChoose(lua_State * L)
+{
+    const char* title = luaL_checkstring(L, 1);
+    const char* defaultPath = luaL_checkstring(L, 2);
+    if (title == nullptr || _pPaintManager == 0) {
+        lua_pushnil(L);
+        return 1;
+    }
+    if (defaultPath == nullptr) {
+        defaultPath = "";
+    }
+    CDuiString str = BrowseForFolder(_pPaintManager->GetPaintWindow(), Utf82Unicode(title).c_str(), Utf82Unicode(defaultPath).c_str());
+    lua_pushstring(L, UnicodeToUtf8(std::wstring(str)).c_str());
+    return 1;
 }
 
 extern "C"
@@ -816,6 +894,7 @@ static int l_RegDeleteKey(lua_State * L)
 }
 
 static const luaL_Reg reglib[] = {
+    {"DiskFreeSpace", l_DiskFreeSpace},
     {"DuiEnable", l_DuiEnable},
     {"DuiOptionSelect", l_DuiOptionSelect},
     {"DuiSetBkImage", l_DuiSetBkImage},
@@ -824,6 +903,7 @@ static const luaL_Reg reglib[] = {
     {"DuiTextColor", l_DuiTextColor},
     {"DuiVisible", l_DuiVisible},
     {"DuiWindowPos", l_DuiWindowPos},
+    {"FilePathChoose", l_FilePathChoose},
     {"ProcessExecute", l_ProcessExecute},
     {"ProcessKill", l_ProcessKill},
     {"GetVersion", l_GetVersion},

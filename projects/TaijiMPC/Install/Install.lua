@@ -68,13 +68,23 @@ function OnButtonClick(btnName)
         else
             install.DuiWindowPos("_MainFrame", 0, 0, 600, 380)
         end
+    elseif (btnName == "browfilebtn") then
+        installPath = install.FilePathChoose("选择安装目录", "C:\\TaijiControl")
+        install.DuiText("pathedit", installPath)
+        --freeSystemSpace = install.DiskFreeSpace("")
+        --freeSpace = install.DiskFreeSpace(installPath)
+        --install.LogPrint(freeSystemSpace, freeSpace)
     elseif (btnName == "closebtn") then
         install.DuiText("titletext", "安装程序")
         install.DuiTextColor("titletext", 0xFFFFFFFF)
         install.DuiSetBkImage("mainlayout", "res='130' restype='png' source='0,0,600,220' corner='300,208,300,5'")
     elseif (btnName == "lookprotbtn") then
+        if (install.DuiVisible("customlayout")) then
+            install.DuiVisible("customlayout", false)
+            install.DuiWindowPos("_MainFrame", 0, 0, 600, 380)
+        end
         install.DuiTabSelect("installlayout", 1)
-        install.DuiSetVisible("custombtn", false)
+        install.DuiVisible("custombtn", false)
         install.DuiText("titletext", "安装许可协议")
         install.DuiTextColor("titletext", 0xFF3B3B3B)
         install.DuiText("portcontent", 133) -- IDR_REGCONTENT1
