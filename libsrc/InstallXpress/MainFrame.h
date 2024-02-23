@@ -45,11 +45,9 @@ public:
 
 private: 
     InstallXpress_Init_t* m_pInit;
-	bool m_bFinish;
 	bool m_bcloseInstall;
 	int  m_nZipFileNum;
 	int  m_nProcess;
-	int  m_nOldProcess;
 	std::wstring m_strCompanyDir;
 	std::wstring m_strAppExePath;
 

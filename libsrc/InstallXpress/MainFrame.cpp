@@ -33,14 +33,12 @@ static CMainFrame* _sglMainFrame = 0;
 
 CMainFrame::CMainFrame(InstallXpress_Init_t* init_t)
     : m_pInit(init_t)
-    , m_bFinish(false)
     , m_bcloseInstall(false)
     , m_pCloseBtn(NULL)
     , m_hThread(NULL)
     , m_pProgress(NULL)
     , m_nZipFileNum(0)
     , m_nProcess(35)
-    , m_nOldProcess(35)
     , m_dirUtility()
     , m_luaPtr(0)
 {
@@ -142,7 +140,6 @@ LRESULT CMainFrame::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 				{
 					m_pProgress->SetValue(15);
 					m_nProcess = 15;
-					m_nOldProcess = 15;
 					::KillTimer(this->GetHWND(), WMPROGRESS_TIMER);
 					SetEvent(ghEvent);					
 					return 0;
@@ -181,7 +178,6 @@ LRESULT CMainFrame::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 				if (pstarusebtn) pstarusebtn->SetVisible(true);
 				if (m_pProgress) m_pProgress->SetVisible(false);
 				if (m_pCloseBtn) m_pCloseBtn->SetEnabled(true);
-				m_bFinish = true;
 				return 0;
 			}
 			rc.left += MOVESIZE;
@@ -334,7 +330,6 @@ void CMainFrame::UpdateProcess(int nprocess)
 	//	str.Format(_T("正在更新%d%%"), m_nProcess);
     str.Format(_T("正在安装%d%%"), m_nProcess);
 	m_pProgress->SetText(str.GetData());
-	m_nOldProcess = nprocess;
 }
 
 void CMainFrame::InstallSetup()
