@@ -30,8 +30,6 @@ public:
 	void WindowInitialized();
 	void _OnClickBtn(TNotifyUI &msg);
 	void _OnSelChanged(TNotifyUI &msg);
-	void VisibleCustomRect();
-	bool CheckDiskSpace(const std::wstring &strInstallDir);
 	bool CheckInstallSize();
 	void InstallSetup();
 	void InstallZip();
@@ -47,8 +45,6 @@ public:
 
 private: 
     InstallXpress_Init_t* m_pInit;
-	//bool m_bupdate;
-	bool m_bcustom;
 	bool m_bFinish;
 	bool m_bcloseInstall;
 	int  m_nZipFileNum;
@@ -61,15 +57,8 @@ private:
 	std::map<UINT, ResourceHandler*> m_resHandlerMap;
 	InstallLua* m_luaPtr;
 
-	CRichEditUI*  m_pRegText;
-	CEditUI*	  m_pInstallEdit;
-	CButtonUI*	  m_pCustombtn;
-	CButtonUI*    m_pStarinstallbtn;
 	CButtonUI*	  m_pCloseBtn;
 	CLabelUI*     m_pTipLabel;
-	CTabLayoutUI* m_pTabLayout;
-	CHorizontalLayoutUI* m_pCustomlayout;
-	CVerticalLayoutUI* m_pmainlayout;
 	CProgressUI*  m_pProgress;
 
 	HANDLE m_hThread;

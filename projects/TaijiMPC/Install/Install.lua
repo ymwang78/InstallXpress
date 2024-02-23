@@ -40,7 +40,6 @@ local CSIDL_Enum = {
 _dirCompany = "C:\\TaijiControl"
 _dirExeHomeDir = _dirCompany .. "\\TaiJiMPC5"
 _dirExeFullPath = _dirCompany .. "\\TaiJiMPC5\\TaiJiMPC.exe"
-_dirPreCompany = _dirCompany
 
 _bCustomPath = false
 
@@ -55,8 +54,8 @@ function OnInitialize()
     if (_dirCompany == nil or _dirCompany == "") then
         _dirCompany = "C:\\TaijiControl"
     end
-    _dirPreCompany = _dirCompany
     ResetInstallPath(_dirCompany)
+    install.DuiText("pathedit", _dirCompany)
 end
 
 function OnButtonClick(btnName)

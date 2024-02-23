@@ -33,15 +33,9 @@ static CMainFrame* _sglMainFrame = 0;
 
 CMainFrame::CMainFrame(InstallXpress_Init_t* init_t)
     : m_pInit(init_t)
-    , m_pCustomlayout(NULL)
-    , m_pCustombtn(NULL)
-    , m_bcustom(true)
     , m_bFinish(false)
     , m_bcloseInstall(false)
     , m_pCloseBtn(NULL)
-    , m_pInstallEdit(NULL)
-    , m_pRegText(NULL)
-    , m_pStarinstallbtn(NULL)
     , m_hThread(NULL)
     , m_pProgress(NULL)
     , m_nZipFileNum(0)
@@ -228,11 +222,6 @@ void CMainFrame::WindowInitialized()
 #endif
     m_luaPtr->OnInitialize();
 
-	m_pCustombtn = static_cast<CButtonUI*>(m_PaintManager.FindControl(_T("custombtn")));
-	m_pCustomlayout = static_cast<CHorizontalLayoutUI*>(m_PaintManager.FindControl(_T("customlayout")));
-	m_pInstallEdit = static_cast<CEditUI*>(m_PaintManager.FindControl(_T("pathedit")));
-	m_pRegText = static_cast<CRichEditUI*>(m_PaintManager.FindControl(_T("portcontent")));
-	m_pStarinstallbtn = static_cast<CButtonUI*>(m_PaintManager.FindControl(_T("starinstallbtn")));
 	m_pTipLabel = static_cast<CLabelUI*>(m_PaintManager.FindControl(_T("errortiplab")));
 	m_pCloseBtn = static_cast<CButtonUI*>(m_PaintManager.FindControl(_T("closebtn")));
 	m_pProgress = static_cast<CProgressUI*>(m_PaintManager.FindControl(_T("installprogress")));
@@ -241,7 +230,6 @@ void CMainFrame::WindowInitialized()
 	m_strCompanyDir = Utf82Unicode(m_luaPtr->QueryByKey_String("InstallPath"));
     _tfullpath(fullHomePath + _tcslen(fullHomePath), m_strCompanyDir.c_str(), sizeof(fullHomePath) / sizeof(fullHomePath[0]));
 	m_strCompanyDir = fullHomePath;	
-	if (m_pInstallEdit) m_pInstallEdit->SetText(m_strCompanyDir.c_str());
 
 	//if (m_bupdate) InstallSetup(); //更新直接安装;
 }
@@ -266,64 +254,6 @@ void CMainFrame::_OnSelChanged(TNotifyUI &msg)
         m_luaPtr->OnSelChanged(UnicodeToUtf8((LPCTSTR)msg.pSender->GetName()),
             pCheck->IsSelected());
     }
-}
-
-void CMainFrame::VisibleCustomRect()
-{
-    return;
-	if (m_bcustom)
-	{
-		SetWindowPos(this->GetHWND(), NULL, 0, 0, m_PaintManager.GetMaxInfo().cx, m_PaintManager.GetMaxInfo().cy, SWP_NOMOVE | SWP_NOZORDER);
-	}
-	else
-	{
-		SetWindowPos(this->GetHWND(), NULL, 0, 0, m_PaintManager.GetMinInfo().cx, m_PaintManager.GetMinInfo().cy, SWP_NOMOVE | SWP_NOZORDER);
-	}
-	m_bcustom = !m_bcustom;
-}
-
-bool CMainFrame::CheckDiskSpace(const std::wstring &strInstallDir)
-{
-	CLabelUI* pLabelError = static_cast<CLabelUI*>(m_PaintManager.FindControl(_T("errortiplab")));
-	//检查系统目录;	
-	{
-		TCHAR str[MAX_PATH] = { 0 };
-		GetSystemDirectory(str, MAX_PATH);
-		std::wstring strsysdir(str);
-		std::wstring strsysdisk = strsysdir.substr(0, 3);
-		{
-			unsigned _int64 i64FreeBytesToCaller = 0;
-			unsigned _int64 i64TotalBytes = 0;
-			unsigned _int64 i64FreeBytes = 0;
-			bool fResult = GetDiskFreeSpaceEx(strsysdisk.c_str(), (PULARGE_INTEGER)&i64FreeBytesToCaller, (PULARGE_INTEGER)&i64TotalBytes, (PULARGE_INTEGER)&i64FreeBytes);
-			unsigned _int64 ufreebytes = i64FreeBytes / 1024 / 1024;
-			if (fResult == true && ufreebytes < 300)
-			{
-				CDuiString strtext = _T("系统盘空间不足,无法完成安装,请清理磁盘空间!");
-				if (pLabelError) pLabelError->SetText(strtext);
-				return false;
-			}
-		}
-	}
-
-	//检查安装盘大小;
-	{
-		std::wstring strInstallDisk = strInstallDir.substr(0, 3);
-		unsigned _int64 i64FreeBytesToCaller = 0;
-		unsigned _int64 i64TotalBytes = 0;
-		unsigned _int64 i64FreeBytes = 0;
-		bool fResult = GetDiskFreeSpaceEx(strInstallDisk.c_str(), (PULARGE_INTEGER)&i64FreeBytesToCaller, (PULARGE_INTEGER)&i64TotalBytes, (PULARGE_INTEGER)&i64FreeBytes);
-		unsigned _int64 ufreebytes = i64FreeBytes / 1024 / 1024;
-		if (fResult == true && ufreebytes < 600)
-		{
-			CDuiString strtext = _T("");
-			strtext.Format(_T("%s 盘空间不足,无法完成安装,请更换安装目录或清理磁盘空间!"), strInstallDisk.c_str());
-			if (pLabelError) pLabelError->SetText(strtext);
-			return false;
-		}
-	}
-	if (pLabelError) pLabelError->SetText(_T(""));
-	return true;
 }
 
 unsigned int _stdcall CMainFrame::InstallThread(void* param)
