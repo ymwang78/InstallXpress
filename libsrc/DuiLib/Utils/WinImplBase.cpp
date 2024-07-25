@@ -449,23 +449,20 @@ LONG WindowImplBase::GetStyle()
 void WindowImplBase::OnClick(TNotifyUI& msg)
 {
 	CDuiString sCtrlName = msg.pSender->GetName();
-	if( sCtrlName == _T("closebtn") )
-	{
-		Close();
-		return; 
-	}
-	else if( sCtrlName == _T("minbtn"))
-	{ 
+    //if (sCtrlName == _T("closebtn")) {
+    //    Close();
+    //    return;
+    //}
+    //else
+    if( sCtrlName == _T("minbtn")) { 
 		SendMessage(WM_SYSCOMMAND, SC_MINIMIZE, 0); 
 		return; 
 	}
-	else if( sCtrlName == _T("maxbtn"))
-	{ 
+	else if( sCtrlName == _T("maxbtn")) {
 		SendMessage(WM_SYSCOMMAND, SC_MAXIMIZE, 0); 
 		return; 
 	}
-	else if( sCtrlName == _T("restorebtn"))
-	{ 
+	else if( sCtrlName == _T("restorebtn")) { 
 		SendMessage(WM_SYSCOMMAND, SC_RESTORE, 0); 
 		return; 
 	}

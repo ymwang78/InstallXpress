@@ -1,11 +1,17 @@
-/**********************************************
-* 文件名:UnZip7z.h;
-* 文件描叙:7z解压;
-***********************************************/
-#ifndef  _UNZIP7Z_H_
-#define  _UNZIP7Z_H_
+#pragma once
 
 class ResourceHandler;
+typedef struct _CSzArEx CSzArEx;
+
+struct notify_msg_t {
+	int nNotifyID;
+	int totalFileNum;
+	int currentFileIndex;
+	unsigned long long totalSize;
+	unsigned long long currentSize;
+	int isDir;
+	WCHAR szFileName[MAX_PATH];
+};
 
 class CUnZip7z
 {
@@ -14,15 +20,13 @@ public:
 	~CUnZip7z();
 
 public:
-	//创建路径 ;
 	BOOL CreatedMultipleDirectory(std::wstring Directoryname);
 	BOOL FolderExist(std::wstring& strPath);
 
 public:
+	unsigned long long GetTotalSize(const CSzArEx* db);
 	int cat_path(LPTSTR lpszPath, LPCWSTR lpSubPath);
 	int save_file(LPCTSTR lpszFile, const void * lpBuf, DWORD dwSize);
-	int unzip_7z_file(ResourceHandler* resHandler, std::wstring &mUnPackPath, HWND callback, UINT Msg);
+	int unzip_7z_file(ResourceHandler* resHandler, std::wstring &mUnPackPath, HWND callback, UINT Msg, UINT nNotifyID);
 	int getunzipfilenum(ResourceHandler* resHandler);
 };
-
-#endif // ! _UNZIP7Z_H_

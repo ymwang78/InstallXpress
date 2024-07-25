@@ -102,7 +102,7 @@ SRes SzAr_DecodeFolder(const CSzAr *p, UInt32 folderIndex,
     Byte *outBuffer, size_t outSize,
     ISzAllocPtr allocMain);
 
-typedef struct
+typedef struct _CSzArEx
 {
   CSzAr db;
 

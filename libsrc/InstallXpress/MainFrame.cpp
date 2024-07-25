@@ -28,7 +28,6 @@
 #define  WM_INSTALLPROGRES_MSG WM_USER+2000
 #define  WM_INSTALLSITEPROGRES_MSG WM_USER+2001
 
-HANDLE ghEvent = NULL; //全局变量;
 static CMainFrame* _sglMainFrame = 0;
 
 CMainFrame::CMainFrame(InstallXpress_Init_t* init_t)
@@ -37,8 +36,6 @@ CMainFrame::CMainFrame(InstallXpress_Init_t* init_t)
     , m_pCloseBtn(NULL)
     , m_hThread(NULL)
     , m_pProgress(NULL)
-    , m_nZipFileNum(0)
-    , m_nProcess(35)
     , m_dirUtility()
     , m_luaPtr(0)
 {
@@ -100,27 +97,22 @@ void CMainFrame::OnFinalMessage(HWND hWnd)
 		CloseHandle(m_hThread);
 		m_hThread = NULL;
 	}
-	if (ghEvent) {
-		CloseHandle(ghEvent);
-		ghEvent = NULL;
-	}
 	delete this;
 }
 
 void CMainFrame::Notify(TNotifyUI& msg)
 {
-	if (_tcsicmp(msg.sType, DUI_MSGTYPE_WINDOWINIT) == 0)
-	{
+	if (_tcsicmp(msg.sType, DUI_MSGTYPE_WINDOWINIT) == 0) {
 		WindowInitialized();
+        return;
 	}
-	else if (_tcsicmp(msg.sType, DUI_MSGTYPE_CLICK) == 0)
-	{
+	else if (_tcsicmp(msg.sType, DUI_MSGTYPE_CLICK) == 0) {
 		_OnClickBtn(msg);
-	}
-	else if (_tcsicmp(msg.sType, DUI_MSGTYPE_SELECTCHANGED) == 0)
-	{
+    }
+	else if (_tcsicmp(msg.sType, DUI_MSGTYPE_SELECTCHANGED) == 0) {
 		_OnSelChanged(msg);
 	}
+    WindowImplBase::Notify(msg);
 }
 
 LRESULT CMainFrame::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -139,9 +131,7 @@ LRESULT CMainFrame::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 				if (rc.left - MOVESIZE < LEFTOFFSET)
 				{
 					m_pProgress->SetValue(15);
-					m_nProcess = 15;
 					::KillTimer(this->GetHWND(), WMPROGRESS_TIMER);
-					SetEvent(ghEvent);					
 					return 0;
 				}
 				rc.left -= MOVESIZE;
@@ -190,31 +180,50 @@ LRESULT CMainFrame::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 LRESULT CMainFrame::HandleCustomMessage(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled)
 {
-	if (WM_INSTALLPROGRES_MSG == uMsg)
-	{
-		int nprocess = (int)(((float)wParam + 1) / (float)(m_nZipFileNum) * 100);
-		if (nprocess == 100 && (int)wParam + 1 < m_nZipFileNum)
-			nprocess = 99;
-		UpdateProcess(nprocess);
+	if (WM_INSTALLPROGRES_MSG == uMsg) {
+        int nNotifyID = (int)wParam;
+        if (lParam != (LPARAM) - 1) {
+            notify_msg_t* pNotifyMsg = (notify_msg_t*)lParam;
+            m_luaPtr->OnUnzipProgress(pNotifyMsg->nNotifyID, pNotifyMsg->totalFileNum, pNotifyMsg->currentFileIndex, pNotifyMsg->totalSize, pNotifyMsg->currentSize);
+            delete pNotifyMsg;
+            bHandled = TRUE;
+        }
+        else {
+            m_luaPtr->OnUnzipProgress(nNotifyID, -1, -1, -1, -1);
+            m_luaPtr->PostSetup();
+        }
+		return 0L;
 	}
 	return WindowImplBase::HandleCustomMessage(uMsg, wParam, lParam, bHandled);
 }
 
+char* remove_bom(const char* str) {
+    if (str == NULL) return NULL;
+    const unsigned char* ustr = (const unsigned char*)str;
+    if (ustr[0] == 0xEF && ustr[1] == 0xBB && ustr[2] == 0xBF) {
+        return strdup(str + 3);
+    }
+    else {
+        return strdup(str);
+    }
+}
+
 void CMainFrame::WindowInitialized()
 {
-	ghEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-	if (ghEvent) {
-		//开启线程检测安装大小;
-		m_hThread = (HANDLE)_beginthreadex(NULL, 0, &CMainFrame::InstallThread, this, 0, NULL);
-	}
 	SetIcon(m_pInit->nResourceIDIcon);
 
     m_luaPtr = new InstallLua(&m_PaintManager, UnicodeToUtf8(DirUtility().Version()));
-#ifdef _DEBUG
+#if 0 //ndef _DEBUG
     m_luaPtr->load_file("Install.lua");
 #else
     ResourceHandler* luaScript = LoadResourceFile(m_pInit->nResourceIDLua, _T("LUA_SCRIPT"));
-    m_luaPtr->load_string((const char*)luaScript->GetData());
+    const char* script = (const char*) luaScript->GetData();
+    if (script) {
+        m_luaPtr->load_string(remove_bom(script));
+    }
+    else {
+        APPLOG(Log::LOG_ERROR)("Load lua script failed");
+    }
 #endif
     m_luaPtr->OnInitialize();
 
@@ -234,8 +243,7 @@ void CMainFrame::_OnClickBtn(TNotifyUI &msg)
 {
     m_luaPtr->OnButtonClick(UnicodeToUtf8((LPCTSTR)msg.pSender->GetName()));
 
-	if (_tcsicmp(msg.pSender->GetName(), _T("starinstallbtn")) == 0)
-	{
+	if (_tcsicmp(msg.pSender->GetName(), _T("starinstallbtn")) == 0) {
 		InstallSetup();
 	}
 	else if (_tcsicmp(msg.pSender->GetName(), _T("starusebtn")) == 0) {
@@ -252,17 +260,27 @@ void CMainFrame::_OnSelChanged(TNotifyUI &msg)
     }
 }
 
+struct InstallXpress_Unzip_Context_t
+{
+	int nResourceID;
+    std::wstring strZipFile;
+    std::wstring strUnzipDir;
+    int nNotifyID;
+	HWND GetHWND() { return _sglMainFrame->GetHWND(); }
+	void InstallZip() { 
+        if (nResourceID)
+            _sglMainFrame->InstallZip(nResourceID, strUnzipDir, nNotifyID);
+        else {
+            //@todo
+            //_sglMainFrame->InstallZip(strZipFile, strUnzipDir, nNotifyID);
+        }
+    }
+};
+
 unsigned int _stdcall CMainFrame::InstallThread(void* param)
 {
-	CMainFrame* pThis = (CMainFrame*)param;
-	if (NULL != pThis)
-	{
-		pThis->CheckInstallSize();
-		WaitForSingleObject(ghEvent, INFINITE);
-
-		if (pThis->m_bcloseInstall) 
-			return 0;
-
+    InstallXpress_Unzip_Context_t* pThis = (InstallXpress_Unzip_Context_t*)param;
+	if (NULL != pThis) {
 		SetTimer(pThis->GetHWND(), WMEXPROCESS_TIMER, 1600, NULL);
 		pThis->InstallZip();
 		::KillTimer(pThis->GetHWND(), WMEXPROCESS_TIMER);
@@ -270,18 +288,39 @@ unsigned int _stdcall CMainFrame::InstallThread(void* param)
 	return 0;
 }
 
-void CMainFrame::InstallZip()
+int  CMainFrame::UnzipFileAsync(unsigned resourceId, const std::wstring& strUnzipDir, int nNotifyID)
+{
+	if (0 == FindResource(m_PaintManager.GetResourceDll(), MAKEINTRESOURCE(resourceId), _T("INSTALLSOFT")))
+		return -1;
+	InstallXpress_Unzip_Context_t* ctx(new InstallXpress_Unzip_Context_t{});
+	ctx->nResourceID = resourceId;
+	ctx->strUnzipDir = strUnzipDir;
+	ctx->nNotifyID = nNotifyID;
+
+	m_hThread = (HANDLE)_beginthreadex(NULL, 0, &CMainFrame::InstallThread, ctx, 0, NULL);
+	return 0;
+}
+
+int CMainFrame::UnzipFileAsync(const std::wstring& strZipFile, const std::wstring& strUnzipDir, int nNotifyID)
+{
+    if (!PathFileExists(strZipFile.c_str()))
+        return -1;
+	InstallXpress_Unzip_Context_t* ctx(new InstallXpress_Unzip_Context_t{});
+    ctx->strZipFile = strZipFile;
+    ctx->strUnzipDir = strUnzipDir;
+    ctx->nNotifyID = nNotifyID;
+
+    m_hThread = (HANDLE)_beginthreadex(NULL, 0, &CMainFrame::InstallThread, ctx, 0, NULL);
+	return 0;
+}
+
+void CMainFrame::InstallZip(UINT nResourceID, const std::wstring& strUnzipDir, int nNotifyID)
 {
 	bool bInstallPiu = true;
 	bool bNewInstall = false;
-	//if (!m_bupdate)
-	//	m_pProgress->SetText(_T("正在安装18%..."));
-	//else
-	//	m_pProgress->SetText(_T("正在更新18%..."));
-    m_pProgress->SetText(_T("正在安装18%..."));
-	m_pProgress->SetValue(m_nProcess);
+	m_pProgress->SetValue(0);
 
-    UINT uId[] = {134};// { IDR_INSTALLSOFT1 };
+    UINT uId[] = { nResourceID };
     bool bInstallFinish = true;
 	////////////////////////////////////	
 	for (unsigned i = 0; i < sizeof(uId) / sizeof(uId[0]); ++i) {
@@ -291,16 +330,16 @@ void CMainFrame::InstallZip()
             return;
         CUnZip7z unzip7z;
 
-		int ret = unzip7z.unzip_7z_file(pInstallContent, m_strCompanyDir, this->GetHWND(), WM_INSTALLPROGRES_MSG);
+		int ret = unzip7z.unzip_7z_file(pInstallContent, m_strCompanyDir, this->GetHWND(), WM_INSTALLPROGRES_MSG, nNotifyID);
         if (ret == 0) 
 			continue;
-        APPLOG(Log::ERRORLOG)("\n---Install: 解压失败 ret:%d---\n", ret);
+        APPLOG(Log::LOG_ERROR)("\n---Install: 解压失败 ret:%d---\n", ret);
 		bInstallFinish = false;
 		break;
 	}
 	if(bInstallFinish) {
-		UpdateProcess(100);
-		bInstallFinish = true;
+        bInstallFinish = true;
+        ::PostMessage(this->GetHWND(), WM_INSTALLPROGRES_MSG, nNotifyID, -1);
 	}
 	else {
 		CDuiString str =/* m_bupdate ? _T("更新失败") :*/ _T("安装失败");
@@ -313,23 +352,7 @@ void CMainFrame::InstallZip()
 		if (m_pCloseBtn) m_pCloseBtn->SetEnabled(true);
 		return;
 	}
-    m_luaPtr->PostSetup();
     SetTimer(this->GetHWND(), WMPROGRESSFINISH_TIMER, PORGRESSHIDESEPLEN, 0);
-}
-
-void CMainFrame::UpdateProcess(int nprocess)
-{
-	m_nProcess = nprocess > m_nProcess ? nprocess : m_nProcess;
-	m_nProcess = m_nProcess > 100 ? 100 : m_nProcess;
-	m_pProgress->SetValue(m_nProcess);
-
-	CDuiString str;
-	//if (!m_bupdate)
-	//	str.Format(_T("正在安装%d%%"), m_nProcess);
-	//else
-	//	str.Format(_T("正在更新%d%%"), m_nProcess);
-    str.Format(_T("正在安装%d%%"), m_nProcess);
-	m_pProgress->SetText(str.GetData());
 }
 
 void CMainFrame::InstallSetup()
@@ -338,25 +361,6 @@ void CMainFrame::InstallSetup()
 		SetTimer(this->GetHWND(), WMPROGRESS_TIMER, PORGRESSSHOWSEPLEN, 0);
 	}
 }
-
-bool CMainFrame::CheckInstallSize()
-{
-	////////////////////////检测站点包大小/////////////////////;
-    UINT uId[] = { 134 };// { IDR_INSTALLSOFT1 };
-	for (unsigned i = 0; i < sizeof(uId) / sizeof(uId[0]); ++i) {
-        ResourceHandler* pInstallContent = LoadResourceFile(uId[i], _T("INSTALLSOFT"));
-        if (pInstallContent == NULL)
-            return false;
-
-        CUnZip7z unzip7z;
-        int nsize = unzip7z.getunzipfilenum(pInstallContent);
-
-        m_nZipFileNum += (nsize == 0 ? 1500 : nsize);
-	}
-
-	return true;
-}
-
 
 ResourceHandler* CMainFrame::LoadResourceFile(UINT uId, LPCTSTR lpType)
 {

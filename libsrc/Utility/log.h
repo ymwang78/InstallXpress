@@ -7,13 +7,16 @@
 
 #include <stdio.h>
 
-#define APPLOG(level)	if (level <= Clog::logLevel)  Clog::print
+#define APPLOG(level)	if (level >= Clog::logLevel)  Clog::print
 
 enum Log
 {
-	ERRORLOG = 1,
-	GRENALLOG,
-	SUCCESSLOG,
+    LOG_TRACE,
+    LOG_DEBUG,
+    LOG_INFOR,
+    LOG_WARNI,
+	LOG_ERROR,
+    LOG_CRITI
 };
 
 class /*UTILITY_API*/ Clog
@@ -23,7 +26,7 @@ public:
 	~Clog();
 
 public:
-	static void open(const wchar_t*file, int level);
+	static void open(const wchar_t* company, const wchar_t*file, int level);
 	static void closeLog();
 	static void print(const char *fmt, ...);
 	static void SetLogLevel(int level);

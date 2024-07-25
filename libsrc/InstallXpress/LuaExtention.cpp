@@ -11,8 +11,11 @@
 #ifdef _WIN32
 #include <direct.h> // For _mkdir() on Windows.
 #endif
+#include <atlbase.h>
 
 #include "InstallXpress.h"
+#include "MainFrame.h"
+#include "Utility/log.h"
 
 #define DEBUG_LUAEXT
 
@@ -171,6 +174,20 @@ static int l_DuiEnable(lua_State * L)
 }
 
 extern "C"
+static int l_DuiMessage(lua_State* L)
+{
+    lua_Integer message_id = lua_tointeger(L, 1);
+    lua_Integer message_wparam = lua_tointeger(L, 2);
+    lua_Integer message_lparam = lua_tointeger(L, 3);
+    if (_pPaintManager == 0) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+    ::PostMessage(_pPaintManager->GetPaintWindow(), (UINT)message_id, (WPARAM)message_wparam, (LPARAM)message_lparam);
+    return 0;
+}
+
+extern "C"
 static int l_DuiOptionSelect(lua_State* L)
 {
     const char* btnName = luaL_checkstring(L, 1);
@@ -189,6 +206,39 @@ static int l_DuiOptionSelect(lua_State* L)
         lua_pushboolean(L, pOptionUI->IsSelected());
         return 1;
     }
+}
+
+extern "C"
+static int l_DuiProgress(lua_State * L)
+{
+    const char* ctrlName = luaL_checkstring(L, 1);
+    if (ctrlName == nullptr || _pPaintManager == 0) {
+        lua_pushnil(L);
+        return 1;
+    }
+    DuiLib::CProgressUI* pControl = dynamic_cast<DuiLib::CProgressUI*>(_pPaintManager->FindControl(Utf82Unicode(ctrlName).c_str()));
+    if (pControl == 0) {
+        if (lua_isnone(L, 2))
+            lua_pushinteger(L, 0);
+        else
+            lua_pushboolean(L, false);
+        return 1;
+    }
+    if (lua_isnone(L, 2)) {
+        lua_pushinteger(L, pControl->GetValue());
+        return 1;
+    }
+    else if (lua_isinteger(L, 2)) {
+        pControl->SetValue((int)lua_tointeger(L, 2));
+        lua_pushboolean(L, true);
+        if (lua_isstring(L, 3)) {
+            const char* text = luaL_checkstring(L, 3);
+            pControl->SetText(Utf82Unicode(text).c_str());
+        }
+        return 1;
+    }
+    lua_pushboolean(L, false);
+    return 1;
 }
 
 extern "C"
@@ -234,7 +284,13 @@ static int l_DuiText(lua_State * L)
     else if (lua_isinteger(L, 2)) {
         do {
             int nID = (int)lua_tointeger(L, 2);
-            HRSRC hResource = ::FindResource(_pPaintManager->GetResourceDll(), MAKEINTRESOURCE(nID), _T("REGCONTENT"));
+            const wchar_t* rcType = L"REGCONTENT";
+            std::wstring rcStr;
+            if (lua_isstring(L, 3)) {
+                rcStr = Utf82Unicode(lua_tostring(L, 3));
+                rcType = rcStr.c_str();
+            }
+            HRSRC hResource = ::FindResource(_pPaintManager->GetResourceDll(), MAKEINTRESOURCE(nID), rcType);
             if (hResource == NULL)
                 break;
             DWORD dwSize = 0;
@@ -259,7 +315,6 @@ static int l_DuiText(lua_State * L)
 #endif
             if (pRegContent.get() == NULL) break;
             string strText(pRegContent.get());
-
 
             std::wstring wstrContent = CTypeConvertUtil::StringToWstring(strText);
             pControl->SetText(wstrContent.c_str());
@@ -442,132 +497,14 @@ static int l_FilePathChoose(lua_State * L)
 }
 
 extern "C"
-static int l_FilePathMakeDir(lua_State * L)
-{
-    const char* path = luaL_checkstring(L, 1);
-    if (path == nullptr) {
-        lua_pushboolean(L, false);
-        return 1;
-    }
-    if (mkdir_p(path)) {
-        lua_pushboolean(L, true);
-        return 1;
-    }
-    lua_pushboolean(L, false);
-    return 1;
-
-}
-
-extern "C"
-static int l_LogPrint(lua_State * L) 
-{
-    int top = lua_gettop(L);
-    for (int i = 1; i <= top; ++i) {
-        OutputDebugStringA(lua_tostring(L, i));
-    }
-    OutputDebugStringA("\n");
-    return 0;
-}
-
-extern "C"
-static int l_ProcessExecute(lua_State * L)
-{
-    bool hidden = true;
-    int wait_sec = -1;
-    const char* cmd = luaL_checkstring(L, 1);
-    std::wstring strCommand = Utf82Unicode(cmd);
-
-    if (lua_isboolean(L, 2))
-        hidden = lua_toboolean(L, 2);
-    if (lua_isinteger(L, 3))
-        wait_sec = (int)lua_tointeger(L, 3);
-
-#ifdef DEBUG_LUAEXT
-    CDuiString log;
-    log.Format(L"%s: %s\n", L"ProcessExecute", strCommand.c_str());
-    OutputDebugString(log);
-#endif
-
-    if (cmd == nullptr) {
-        lua_pushboolean(L, false);
-        return 1;
-    }
-
-    ExecuteProcess(strCommand.c_str(), hidden, wait_sec);
-    lua_pushboolean(L, true);
-    return 1;
-}
-
-extern "C"
-static int l_ProcessKill(lua_State * L)
-{
-    const char* processName = luaL_checkstring(L, 1);
-    std::wstring strProcessName = Utf82Unicode(processName);
-#ifdef DEBUG_LUAEXT
-    CDuiString log;
-    log.Format(L"%s: %s\n", L"ProcessKill", strProcessName.c_str());
-    OutputDebugString(log);
-#endif
-    BOOL ret = KillProcess(strProcessName.c_str());
-    lua_pushboolean(L, ret);
-    return 1;
-}
-
-extern "C"
-static int l_RunAsAdmin(lua_State * L)
-{
-    BOOL ret = TryElevate();
-    lua_pushboolean(L, ret);
-    return 1;
-}
-
-extern "C"
-static int l_GetVersion(lua_State * L) 
-{
-    lua_pushstring(L, _strVersion.c_str());
-    return 1;
-}
-
-extern "C"
-static int l_GetSpecialFolderLocation(lua_State * L) 
-{
-    int nFolder = (int)lua_tointeger(L, 1);
-    if (nFolder < 0 || nFolder > 0x8000) {
-        lua_pushnil(L);
-        return 1;
-    }
-
-    wchar_t szPath[MAX_PATH] = { 0 };
-
-    if (SUCCEEDED(SHGetFolderPath(NULL,
-        nFolder | CSIDL_FLAG_CREATE,
-        NULL,
-        0,
-        szPath)))
-    {
-        lua_pushstring(L, UnicodeToUtf8(szPath).c_str());
-        return 1;
-    }
-
-    lua_pushnil(L);
-    return 1;   
-}
-
-extern "C"
-static int l_CreateShortCut(lua_State * L)
+static int l_FilePathCreateShortCut(lua_State * L)
 {
     const char* lnk = luaL_checkstring(L, 1);
     const char* target = luaL_checkstring(L, 2);
     const char* workdir = luaL_checkstring(L, 3);
     const char* description = luaL_checkstring(L, 4);
-    //const char* icon = luaL_checkstring(L, 5);
-    //const char* hotkey = luaL_checkstring(L, 6);
-    //const char* showcmd = luaL_checkstring(L, 7);
 
-#ifdef DEBUG_LUAEXT
-    OutputDebugStringA("CreateShortCut");
-    OutputDebugStringA(lnk);
-#endif
+    APPLOG(LOG_TRACE)("%s: %s\n", "FilePathCreateShortCut", lnk);
 
     if (lnk == nullptr || target == nullptr || workdir == nullptr || description == nullptr) {
         lua_pushboolean(L, false);
@@ -611,22 +548,34 @@ static int l_CreateShortCut(lua_State * L)
 }
 
 extern "C"
-static int l_CreateDirectory(lua_State * L) 
+static int l_FilePathDelete(lua_State * L)
 {
     const char* path = luaL_checkstring(L, 1);
-#ifdef DEBUG_LUAEXT
-    OutputDebugStringA("CreateDirectory");
-    OutputDebugStringA(path);
-#endif
+
+    APPLOG(LOG_TRACE)("%s: %s\n", "FilePathDelete", path);
 
     if (path == nullptr) {
         lua_pushboolean(L, false);
         return 1;
     }
+    DWORD attributes = GetFileAttributesA(path);
 
-    if (CreateDirectory(Utf82Unicode(path).c_str(), NULL)) {
-        lua_pushboolean(L, true);
+    if (attributes == INVALID_FILE_ATTRIBUTES) {
+        lua_pushboolean(L, false);
         return 1;
+    }
+
+    if (attributes & FILE_ATTRIBUTE_DIRECTORY) {
+        if (DeleteDirectory(Utf82Unicode(path).c_str())) {
+            lua_pushboolean(L, true);
+            return 1;
+        }
+    }
+    else {
+        if (DeleteFile(Utf82Unicode(path).c_str())) {
+            lua_pushboolean(L, true);
+            return 1;
+        }
     }
 
     lua_pushboolean(L, false);
@@ -634,48 +583,170 @@ static int l_CreateDirectory(lua_State * L)
 }
 
 extern "C"
-static int l_DeleteFile(lua_State * L)
+static int l_FilePathExists(lua_State * L)
 {
     const char* path = luaL_checkstring(L, 1);
-#ifdef DEBUG_LUAEXT
-    OutputDebugStringA("DeleteFile");
-    OutputDebugStringA(path);
-#endif
     if (path == nullptr) {
         lua_pushboolean(L, false);
         return 1;
     }
+    DWORD attributes = GetFileAttributesA(path);
+    if (attributes == INVALID_FILE_ATTRIBUTES) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+    lua_pushboolean(L, true);
+    return 1;
+}
 
-    if (DeleteFile(Utf82Unicode(path).c_str())) {
-        lua_pushboolean(L, true);
+extern "C"
+static int l_FilePathGetSpecialLocation(lua_State * L)
+{
+    int nFolder = (int)lua_tointeger(L, 1);
+    if (nFolder < 0 || nFolder > 0x8000) {
+        lua_pushnil(L);
         return 1;
     }
 
+    wchar_t szPath[MAX_PATH] = { 0 };
+
+    if (SUCCEEDED(SHGetFolderPath(NULL,
+        nFolder | CSIDL_FLAG_CREATE,
+        NULL,
+        0,
+        szPath)))
+    {
+        lua_pushstring(L, UnicodeToUtf8(szPath).c_str());
+        return 1;
+    }
+
+    lua_pushnil(L);
+    return 1;
+}
+
+extern "C"
+static int l_FilePathMakeDir(lua_State * L)
+{
+    const char* path = luaL_checkstring(L, 1);
+    if (path == nullptr) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+    if (mkdir_p(path)) {
+        lua_pushboolean(L, true);
+        return 1;
+    }
+    lua_pushboolean(L, false);
+    return 1;
+
+}
+
+extern "C"
+static int l_FilePathUnzipAsync(lua_State * L)
+{
+    //FilePathUnzip(zipFile, destDir, NotifyID)
+    if (lua_isinteger(L, 1)) {
+        unsigned resourceId = (unsigned) lua_tointeger(L, 1);
+		const char* destDir = luaL_checkstring(L, 2);
+		int notifyID = 0;
+		if (resourceId == 0 || destDir == nullptr) {
+			lua_pushboolean(L, false);
+			return 1;
+		}
+		if (lua_isinteger(L, 3))
+			notifyID = (int)lua_tointeger(L, 3);
+
+		int ret = CMainFrame::GetInstance()->UnzipFileAsync(resourceId, Utf82Unicode(destDir), notifyID);
+
+		lua_pushboolean(L, ret >= 0);
+		return 1;
+    }
+    else if (lua_isstring(L, 1)) {
+		const char* zipFile = luaL_checkstring(L, 1);
+		const char* destDir = luaL_checkstring(L, 2);
+		int notifyID = 0;
+		if (zipFile == nullptr || destDir == nullptr) {
+			lua_pushboolean(L, false);
+			return 1;
+		}
+		if (lua_isinteger(L, 3))
+			notifyID = (int)lua_tointeger(L, 3);
+
+		int ret = CMainFrame::GetInstance()->UnzipFileAsync(Utf82Unicode(zipFile), Utf82Unicode(destDir), notifyID);
+
+		lua_pushboolean(L, ret >= 0);
+		return 1;
+    }
     lua_pushboolean(L, false);
     return 1;
 }
 
 extern "C"
-static int l_DeleteDirectory(lua_State * L) 
+static int l_LogPrint(lua_State * L) 
 {
-    const char* path = luaL_checkstring(L, 1);
-#ifdef DEBUG_LUAEXT
-    OutputDebugStringA("DeleteDirectory");
-    OutputDebugStringA(path);
-#endif
-    if (path == nullptr) {
+    std::string log;
+    int top = lua_gettop(L);
+    for (int i = 1; i <= top; ++i) {
+        const char* v = lua_tostring(L, i);
+        if (v == nullptr) {
+            log += "nil";
+        }
+        else {
+            log += v;
+        }
+    }
+    log += "\n";
+
+    APPLOG(LOG_TRACE)("%s", log.c_str());
+    return 0;
+}
+
+extern "C"
+static int l_ProcessExecute(lua_State * L)
+{
+    bool hidden = true;
+    int wait_sec = -1;
+    const char* cmd = luaL_checkstring(L, 1);
+    std::wstring strCommand = Utf82Unicode(cmd);
+
+    if (lua_isboolean(L, 2))
+        hidden = lua_toboolean(L, 2);
+    if (lua_isinteger(L, 3))
+        wait_sec = (int)lua_tointeger(L, 3);
+
+    APPLOG(LOG_TRACE)("%s: %s\n", "ProcessExecute", cmd);
+
+    if (cmd == nullptr) {
         lua_pushboolean(L, false);
         return 1;
     }
 
-    if (RemoveDirectory(Utf82Unicode(path).c_str())) {
-        lua_pushboolean(L, true);
-        return 1;
-    }
-
-    lua_pushboolean(L, false);
+    ExecuteProcess(strCommand.c_str(), hidden, wait_sec);
+    lua_pushboolean(L, true);
     return 1;
 }
+
+extern "C"
+static int l_ProcessKill(lua_State * L)
+{
+    const char* processName = luaL_checkstring(L, 1);
+    std::wstring strProcessName = Utf82Unicode(processName);
+
+    APPLOG(LOG_TRACE)("%s: %s\n", "ProcessKill", processName);
+
+    BOOL ret = KillProcess(strProcessName.c_str());
+    lua_pushboolean(L, ret);
+    return 1;
+}
+
+extern "C"
+static int l_RunAsAdmin(lua_State * L)
+{
+    BOOL ret = TryElevate();
+    lua_pushboolean(L, ret);
+    return 1;
+}
+
 
 extern "C"
 static int l_RegGetValue(lua_State* L) 
@@ -745,11 +816,7 @@ static int l_RegSetValue(lua_State* L)
     const char* path = luaL_checkstring(L, 2);
     const char* key = luaL_checkstring(L, 3);
 
-#ifdef DEBUG_LUAEXT
-    OutputDebugStringA("RegSetValue");
-    OutputDebugStringA(path);
-    OutputDebugStringA(key);
-#endif
+    APPLOG(LOG_TRACE)("%s: %s, %s\n", "RegSetValue", path, key);
 
     if (rootKeyID < 0 || rootKeyID >= sizeof(_hRootKeyID) / sizeof(_hRootKeyID[0])) {
         lua_pushboolean(L, 0);
@@ -804,11 +871,8 @@ static int l_RegDeleteValue(lua_State * L)
     const char* path = luaL_checkstring(L, 2);
     const char* key = luaL_checkstring(L, 3);
 
-#ifdef DEBUG_LUAEXT
-    OutputDebugStringA("RegDeleteValue");
-    OutputDebugStringA(path);
-    OutputDebugStringA(key);
-#endif
+    APPLOG(LOG_TRACE)("%s: %s, %s\n", "RegDeleteValue", path, key);
+
     if (rootKeyID < 0 || rootKeyID >= sizeof(_hRootKeyID) / sizeof(_hRootKeyID[0])) {
         lua_pushboolean(L, 0);
         return 1;
@@ -848,12 +912,8 @@ static int l_RegDeleteKey(lua_State * L)
     if (lua_isstring(L, 3))
         key = luaL_checkstring(L, 3);
 
-#ifdef DEBUG_LUAEXT
-    OutputDebugStringA("RegDeleteKey");
-    OutputDebugStringA(path);
-    if (key)
-        OutputDebugStringA(key);
-#endif
+    APPLOG(LOG_TRACE)("%s: %s, %s\n", "RegDeleteKey", path, key ? key : "");
+
     if (rootKeyID < 0 || rootKeyID >= sizeof(_hRootKeyID) / sizeof(_hRootKeyID[0])) {
         lua_pushboolean(L, 0);
         return 1;
@@ -884,34 +944,161 @@ static int l_RegDeleteKey(lua_State * L)
     return 1;
 }
 
+extern "C"
+static int l_SysACP(lua_State * L)
+{
+    lua_pushinteger(L, GetACP());
+    return 1;
+}
+
+
+static bool SetSysEnvironmentVariable(const wchar_t* name, const wchar_t* value) {
+    HKEY hKey;
+    DWORD dwDisposition;
+
+    //if (RegCreateKeyEx(HKEY_CURRENT_USER, TEXT("Environment"),
+    if (RegCreateKeyEx(HKEY_LOCAL_MACHINE, TEXT("SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"),
+        0, NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hKey, &dwDisposition) != ERROR_SUCCESS) {
+        return false;
+    }
+
+    if (RegSetValueEx(hKey, name, 0, REG_SZ, (const BYTE*)value, sizeof(wchar_t) * (wcslen(value) + 1)) != ERROR_SUCCESS) {
+        RegCloseKey(hKey);
+        return false;
+    }
+
+    RegCloseKey(hKey);
+
+    SendMessageTimeout(HWND_BROADCAST, WM_SETTINGCHANGE, 0, (LPARAM)"Environment", SMTO_ABORTIFHUNG, 5000, NULL);
+    return true;
+}
+
+static int l_SysEnvSet(lua_State* L)
+{
+    if (lua_gettop(L) != 2) {
+        lua_pushboolean(L, 0);
+        lua_pushstring(L, "Incorrect number of arguments. Expected 2 (name, value)");
+        return 2;
+    }
+
+    const char* name = luaL_checkstring(L, 1);
+    const char* value = luaL_checkstring(L, 2);
+    APPLOG(LOG_TRACE)("%s: %s, %s\n", "SysEnvSet", name, value);
+
+    if (SetSysEnvironmentVariable(Utf82Unicode(name).c_str(), Utf82Unicode(value).c_str())) {
+        lua_pushboolean(L, 1); // Return true on success
+        return 1;
+    }
+    else {
+        lua_pushboolean(L, 0); // Return false on failure
+        lua_pushstring(L, "Failed to set environment variable");
+        return 2;
+    }
+}
+
+static bool isPathPresent(const std::wstring& currentPath, const std::wstring& newPath)
+{
+    size_t start_pos = 0, commet_pos = 0;
+    while ((commet_pos = currentPath.find(';', start_pos)) != std::wstring::npos) {
+        if (currentPath.substr(start_pos, newPath.length()) == newPath) {
+            return true;
+        }
+        start_pos = commet_pos + 1;
+    }
+    return false;
+}
+
+static int l_SysPathAdd(lua_State* L)
+{
+    const char* newPath = luaL_checkstring(L, 1);
+    std::wstring new_path_str = Utf82Unicode(newPath);
+
+    CRegKey regKey;
+    APPLOG(LOG_TRACE)("%s: %s\n", "SysPathAdd", newPath);
+
+    //LONG result = regKey.Open(HKEY_CURRENT_USER, TEXT("Environment"), KEY_READ | KEY_WRITE);
+    LONG result = regKey.Open(HKEY_LOCAL_MACHINE, TEXT("SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"), KEY_READ | KEY_WRITE);
+    if (result != ERROR_SUCCESS) {
+        lua_pushboolean(L, 0);
+        lua_pushstring(L, "Failed to open registry key");
+        return 2;
+    }
+
+    DWORD size = 0;
+    result = regKey.QueryStringValue(TEXT("Path"), NULL, &size);
+    if (result != ERROR_SUCCESS) {
+        lua_pushboolean(L, 0);
+        lua_pushstring(L, "Failed to read PATH value");
+        return 2;
+    }
+
+    std::vector<wchar_t> vec(size + 1, 0);
+
+
+    result = regKey.QueryStringValue(TEXT("Path"), vec.data(), &size);
+    if (result != ERROR_SUCCESS) {
+        lua_pushboolean(L, 0);
+        lua_pushstring(L, "Failed to read PATH value");
+        return 2;
+    }
+
+    std::wstring current_path(vec.data());
+
+    if (isPathPresent(current_path, new_path_str)) {
+        lua_pushboolean(L, 1);
+        return 1;
+    }
+    current_path += L";";
+    current_path += new_path_str;
+
+    result = regKey.SetStringValue(TEXT("Path"), current_path.c_str(), REG_EXPAND_SZ);
+    if (result != ERROR_SUCCESS) {
+        lua_pushboolean(L, 0);
+        lua_pushstring(L, "Failed to set new PATH value");
+        return 2;
+    }
+
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
 static const luaL_Reg reglib[] = {
     {"DiskFreeSpace", l_DiskFreeSpace},
     {"DuiEnable", l_DuiEnable},
+    {"DuiMessage", l_DuiMessage},
     {"DuiOptionSelect", l_DuiOptionSelect},
+    {"DuiProgress", l_DuiProgress},
     {"DuiSetBkImage", l_DuiSetBkImage},
     {"DuiTabSelect", l_DuiTabSelect},
     {"DuiText", l_DuiText},
     {"DuiTextColor", l_DuiTextColor},
     {"DuiVisible", l_DuiVisible},
     {"DuiWindowPos", l_DuiWindowPos},
+
     {"FilePathChoose", l_FilePathChoose},
+    {"FilePathCreateShortCut", l_FilePathCreateShortCut},
+    {"FilePathDelete", l_FilePathDelete},
+    {"FilePathExists", l_FilePathExists},
+    {"FilePathGetSpecialLocation", l_FilePathGetSpecialLocation},
     {"FilePathMkdir", l_FilePathMakeDir},
+    {"FilePathUnzip", l_FilePathUnzipAsync},
+
+    {"LogPrint", l_LogPrint},
+
     {"ProcessExecute", l_ProcessExecute},
     {"ProcessKill", l_ProcessKill},
 
     {"RunAsAdmin", l_RunAsAdmin},
 
-    {"GetVersion", l_GetVersion},
-    {"GetSpecialFolderLocation", l_GetSpecialFolderLocation},
-    {"CreateShortCut", l_CreateShortCut},
-    {"CreateDirectory", l_CreateDirectory},
-    {"DeleteFile", l_DeleteFile},
-    {"DeleteDirectory", l_DeleteDirectory},
     {"RegGetValue", l_RegGetValue},
     {"RegSetValue", l_RegSetValue},
     {"RegDeleteValue", l_RegDeleteValue},
     {"RegDeleteKey", l_RegDeleteKey},
-    {"LogPrint", l_LogPrint},
+
+    {"SysACP", l_SysACP},
+    {"SysEnvSet", l_SysEnvSet},
+    {"SysPathAdd", l_SysPathAdd},
+
     // 添加其他函数
     {NULL, NULL}
 };
@@ -1000,8 +1187,8 @@ lua_base::lua_base()
     lua_ = luaL_newstate();
     luaL_openlibs(lua_);
     lua_pushlightuserdata(lua_, this);
-    lua_setfield(lua_, LUA_REGISTRYINDEX, "install.vm");
-    luaL_requiref(lua_, "install", luaopen_reg, 1);
+    lua_setfield(lua_, LUA_REGISTRYINDEX, "installx.vm");
+    luaL_requiref(lua_, "installx", luaopen_reg, 1);
     lua_pop(lua_, 1);
 }
 
@@ -1062,6 +1249,12 @@ void InstallLua::OnSelChanged(const std::string& strButtonName, bool isSelected)
 {
     lua_function<void> func(lua_, "OnSelChanged");
     func(strButtonName, isSelected);
+}
+
+void InstallLua::OnUnzipProgress(int nNotifyID, unsigned nFileNum, unsigned nCurFileIndex, unsigned long long i64TotalSize, unsigned long long iCurSize)
+{
+    lua_function<void> func(lua_, "OnUnzipProgress");
+    func(nNotifyID, (lua_Integer)nFileNum, (lua_Integer)nCurFileIndex, (lua_Integer)i64TotalSize, (lua_Integer)iCurSize);
 }
 
 void InstallLua::ResetInstallPath(const std::string& strInstallPath)

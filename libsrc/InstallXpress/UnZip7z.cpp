@@ -1,4 +1,4 @@
-#include "stdafx.h"
+ï»¿#include "stdafx.h"
 #include "UnZip7z.h"
 #include <Shlwapi.h>
 #include "Utility/TypeConvertUtil.h"
@@ -31,6 +31,15 @@ CUnZip7z::~CUnZip7z()
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // 
+
+unsigned long long CUnZip7z::GetTotalSize(const CSzArEx* db)
+{
+	UInt64 totalSize = 0;
+	for (UInt32 i = 0; i < db->NumFiles; i++) {
+		totalSize += SzArEx_GetFileSize(db, i);
+	}
+	return totalSize;
+}
 
 int CUnZip7z::cat_path(LPTSTR lpszPath, LPCWSTR lpSubPath)
 {
@@ -96,7 +105,7 @@ int CUnZip7z::getunzipfilenum(ResourceHandler* resHandler)
 
 	res = SzArEx_Open(&db, &lookIn.vtbl, &allocImp, &allocTempImp);
 
-	// Èç¹ûÃ»ÓĞ´ò¿ª³É¹¦,¾Í²»»áÓĞÎÄ¼ş; 
+	// å¦‚æœæ²¡æœ‰æ‰“å¼€æˆåŠŸ,å°±ä¸ä¼šæœ‰æ–‡ä»¶; 
 	if (SZ_OK == res) {
 		nsize = db.NumFiles;
 	}
@@ -109,20 +118,13 @@ int CUnZip7z::getunzipfilenum(ResourceHandler* resHandler)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // 
-int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, std::wstring &mUnPackPath, HWND callback, UINT Msg)
+int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, std::wstring &mUnPackPath, HWND callback, UINT Msg, UINT nNotifyID)
 {
-	int nRet = 0;
 	LPCTSTR lpszOutputPath = mUnPackPath.c_str();
-	//Èç¹û½âÑ¹ËõµÄÂ·¾¶²»´æÔÚ ÊÔÍ¼´´½¨Ëü ;
-	if (!FolderExist(mUnPackPath))
-	{
-		//½âÑ¹ºó´æ·ÅµÄÎÄ¼ş¼Ğ²»´æÔÚ ´´½¨Ëü ;
-		//@todo ÇëÇóÌáÈ¨
-		if (FALSE == CreatedMultipleDirectory(mUnPackPath))
-		{
-			APPLOG(Log::ERRORLOG)("\n---unzip_7z_file: %s create faile ---\n", WtoS(mUnPackPath).c_str());
-			//´´½¨Ä¿Â¼Ê§°Ü ;
-			return FALSE;
+	if (!FolderExist(mUnPackPath)) {
+		if (FALSE == CreatedMultipleDirectory(mUnPackPath)) {
+			APPLOG(Log::LOG_ERROR)("\n---unzip_7z_file: %s create faile ---\n", WtoS(mUnPackPath).c_str());
+			return -1;
 		}
 	}
 
@@ -130,177 +132,140 @@ int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, std::wstring &mUnPackPa
 	SRes res;
 	ISzAlloc allocImp;
 	ISzAlloc allocTempImp;
-	UInt16 *temp = NULL;
-	size_t tempSize = 0;
 
     CMem7zLookInStream lookIn{ 0 };
-
     InitMem7zLookInStream(&lookIn, (const BYTE*)resHandler->GetData(), resHandler->GetSize());
 
-	////////////////////////////////////////////////////////////  
-	// init  
 	allocImp.Alloc = SzAlloc;
 	allocImp.Free = SzFree;
-
 	allocTempImp.Alloc = SzAllocTemp;
 	allocTempImp.Free = SzFreeTemp;
 
 	CrcGenerateTable();
-
 	SzArEx_Init(&db);
-
 	res = SzArEx_Open(&db, &lookIn.vtbl, &allocImp, &allocTempImp);
 
-	// Èç¹ûÃ»ÓĞ´ò¿ª³É¹¦,¾Í²»»áÓĞÎÄ¼ş; 
-	if (SZ_OK == nRet)
-	{	
-		UInt32 blockIndex = 0xFFFFFFFF; // it can have any value before first call (if outBuffer = 0)   
-		Byte *outBuffer = 0;            // it must be 0 before first call for each new archive.   
-		size_t outBufferSize = 0;       // it can have any value before first call (if outBuffer = 0)   
+	if (SZ_OK != res) {
+		APPLOG(Log::LOG_ERROR)("\n---unzip_7z_file: %u open zip faile ---\n", res);
+		SzArEx_Free(&db, &allocImp);
+		return res;
+	}
 
-		for (unsigned int i = 0; i < db.NumFiles; ++i)
-		{
-			size_t offset = 0;
-			size_t outSizeProcessed = 0;
-			size_t len;
+	unsigned long long totalSize = GetTotalSize(&db);
 
-			unsigned isDir = SzArEx_IsDir(&db, i);
-			len = SzArEx_GetFileNameUtf16(&db, i, NULL);
+	size_t tempSize = 0;
+	UInt32 blockIndex = 0xFFFFFFFF; // it can have any value before first call (if outBuffer = 0)   
+	Byte *outBuffer = 0;            // it must be 0 before first call for each new archive.   
+	size_t outBufferSize = 0;       // it can have any value before first call (if outBuffer = 0)   
 
-			if (len > tempSize)
-			{
-				SzFree(NULL, temp);
-				tempSize = len;
-				temp = (UInt16 *)SzAlloc(NULL, tempSize * sizeof(temp[0]));
-				if (!temp)
-				{
-					APPLOG(Log::ERRORLOG)("\n---unzip_7z_file: mem error ---\n");
-					res = SZ_ERROR_MEM;
-					break;
-				}
-			}
-			SzArEx_GetFileNameUtf16(&db, i, temp);
+	for (unsigned int i = 0; i < db.NumFiles; ++i) {
+		notify_msg_t* pNotifyMsg = new notify_msg_t{};
+		pNotifyMsg->nNotifyID = nNotifyID;
+		pNotifyMsg->totalFileNum = db.NumFiles;
+		pNotifyMsg->currentFileIndex = i;
+		pNotifyMsg->totalSize = totalSize;
 
-			if (!isDir)
-			{
-				res = SzArEx_Extract(&db, &lookIn.vtbl, i, &blockIndex, &outBuffer, &outBufferSize,
-					&offset, &outSizeProcessed, &allocImp, &allocTempImp);
-				if (res != SZ_OK)
-				{
-					APPLOG(Log::ERRORLOG)("\n---unzip_7z_file: SzArEx_Extract error,error code : %d ---\n", res);
-					break;
-				}				
-			}
+		size_t offset = 0;
+		size_t outSizeProcessed = 0;
+		size_t len;
+		pNotifyMsg->isDir = SzArEx_IsDir(&db, i);
+		len = SzArEx_GetFileNameUtf16(&db, i, (UInt16*)pNotifyMsg->szFileName);
 
-			TCHAR szFile[MAX_PATH] = { 0 };
-			_tcscpy_s(szFile, lpszOutputPath);
-
-			CSzFile outFile;
-			size_t processedSize;
-			PathAppend(szFile, (LPCWSTR)temp);
-
-			for (size_t j = 0; szFile[j] != 0; j++)
-			{
-				if ((szFile[j] == '/') || (szFile[j] == '\\'))
-				{
-					szFile[j] = 0;
-					CreateDirectory(szFile, 0);
-					szFile[j] = CHAR_PATH_SEPARATOR;
-				}
-			}
-			if (isDir)
-			{
-				CreateDirectory(szFile, 0);
-				PostMessage(callback, Msg, i, db.NumFiles);
-				continue;
-			}
-			else 
-			{
-                //if (PathFileExists(szFile)) {
-                //    BOOL bRet = DeleteFile(szFile);
-                //    if (!bRet) {
-                //        APPLOG(Log::ERRORLOG)("\n---unzip_7z_file: DeleteFile error, filename : %s ,last error:%lu---\n", WtoS(szFile).c_str(), GetLastError());
-                //    }
-                //}
-
-				do {
-					res = 0;
-					//OutputDebugString(szFile);
-					//OutputDebugString(L"\n");
-                    DWORD dLastError = OutFile_OpenW(&outFile, szFile);
-                    if (dLastError) {
-						if (dLastError == 5) {
-							//HASP»á¾Ü¾øÆäËû½ø³Ì·ÃÎÊ£¬ÏÈÓÃSHELLÈ¥É¾³ı
-                            CDuiString delCommand;
-                            //delCommand.Format(L"del /f /s /q %s", szFile);
-                            //_wsystem(delCommand);
-							delCommand.Format(L"cmd /c del /F /Q %s", szFile);
-                            ExecuteProcess(delCommand, true, -1);
-							dLastError = OutFile_OpenW(&outFile, szFile);
-						}
-						if (dLastError) {
-                            res = SZ_ERROR_FAIL;
-                            APPLOG(Log::ERRORLOG)("\n---unzip_7z_file: OutFile_OpenW error, filename : %s ,last error:%lu---\n", WtoS(szFile).c_str(), dLastError);
-                            CDuiString msg;
-                            msg.Format(_T("Ğ´ÈëÎÄ¼ş:<%s>Ê§°Ü"), szFile);
-                            int ret = MessageBox(NULL, msg, _T("´íÎóÌáÊ¾"), MB_ABORTRETRYIGNORE);
-                            if (ret == IDRETRY)
-                            {
-                                continue;
-                            }
-                            else if (ret == IDIGNORE) {
-                                break;
-                            }
-                            else {
-                                exit(0);
-                            }
-						}
-                    }
-				} while (res == SZ_ERROR_FAIL);
-				if (res == SZ_ERROR_FAIL) {
-                    processedSize = outSizeProcessed;
-                    continue;
-				}
-			}
-			processedSize = outSizeProcessed;
-
-			if (File_Write(&outFile, outBuffer + offset, &processedSize) != 0 || processedSize != outSizeProcessed)
-			{
-				res = SZ_ERROR_FAIL;
-				APPLOG(Log::ERRORLOG)("\n---unzip_7z_file: File_Write error --\n");
+		if (!pNotifyMsg->isDir) {
+			res = SzArEx_Extract(&db, &lookIn.vtbl, i, &blockIndex, &outBuffer, &outBufferSize,
+				&offset, &outSizeProcessed, &allocImp, &allocTempImp);
+			if (res != SZ_OK) {
+				APPLOG(Log::LOG_ERROR)("\n---unzip_7z_file: SzArEx_Extract error,error code : %d ---\n", res);
 				break;
 			}
-
-			if (File_Close(&outFile))
-			{
-				res = SZ_ERROR_FAIL;
-				APPLOG(Log::ERRORLOG)("\n---unzip_7z_file: File_Close error --\n");
-				break;
-			}
-
-#ifdef USE_WINDOWS_FILE
-			if (SzBitWithVals_Check(&db.Attribs, i))
-				SetFileAttributesW(szFile, db.Attribs.Vals[i]);
-#endif
-			PostMessage(callback, Msg, i, db.NumFiles);
+			pNotifyMsg->currentSize += outSizeProcessed;
 		}
 
-		IAlloc_Free(&allocImp, outBuffer);
-	}
-	else
-	{
-		APPLOG(Log::ERRORLOG)("\n---unzip_7z_file: %u open zip faile ---\n", res);
-	}
-	SzArEx_Free(&db, &allocImp);
-	SzFree(NULL, temp);
+		TCHAR szFile[MAX_PATH] = { 0 };
+		_tcscpy_s(szFile, lpszOutputPath);
 
+		CSzFile outFile;
+		size_t processedSize;
+		PathAppend(szFile, (LPCWSTR)pNotifyMsg->szFileName);
+
+		for (size_t j = 0; szFile[j] != 0; j++) {
+			if ((szFile[j] == '/') || (szFile[j] == '\\')) {
+				szFile[j] = 0;
+				CreateDirectory(szFile, 0);
+				szFile[j] = CHAR_PATH_SEPARATOR;
+			}
+		}
+		if (pNotifyMsg->isDir) {
+			CreateDirectory(szFile, 0);
+			PostMessage(callback, Msg, nNotifyID, (LPARAM)pNotifyMsg);
+			continue;
+		}
+		else {
+			do {
+				res = 0;
+                DWORD dLastError = OutFile_OpenW(&outFile, szFile);
+                if (dLastError) {
+					if (dLastError == 5) {
+						//æœ‰çš„ç¨‹åºä¾‹å¦‚HASPä¼šæ‹’ç»å…¶ä»–è¿›ç¨‹è®¿é—®ï¼Œå…ˆç”¨SHELLå»åˆ é™¤
+                        CDuiString delCommand;
+						delCommand.Format(L"cmd /c del /F /Q %s", szFile);
+                        ExecuteProcess(delCommand, true, -1);
+						dLastError = OutFile_OpenW(&outFile, szFile);
+					}
+					if (dLastError) {
+                        res = SZ_ERROR_FAIL;
+                        APPLOG(Log::LOG_ERROR)("\n---unzip_7z_file: OutFile_OpenW error, filename : %s ,last error:%lu---\n", WtoS(szFile).c_str(), dLastError);
+                        CDuiString msg;
+                        msg.Format(_T("å†™å…¥æ–‡ä»¶:<%s>å¤±è´¥"), szFile);
+                        int ret = MessageBox(NULL, msg, _T("é”™è¯¯æç¤º"), MB_ABORTRETRYIGNORE);
+                        if (ret == IDRETRY) {
+                            continue;
+                        }
+                        else if (ret == IDIGNORE) {
+                            break;
+                        }
+                        else {
+                            exit(0);
+                        }
+					}
+                }
+			} while (res == SZ_ERROR_FAIL);
+			if (res == SZ_ERROR_FAIL) {
+                processedSize = outSizeProcessed;
+                continue;
+			}
+		}
+		processedSize = outSizeProcessed;
+
+		if (File_Write(&outFile, outBuffer + offset, &processedSize) != 0 || processedSize != outSizeProcessed) {
+			res = SZ_ERROR_FAIL;
+			APPLOG(Log::LOG_ERROR)("\n---unzip_7z_file: File_Write error --\n");
+			break;
+		}
+
+		if (File_Close(&outFile)) {
+			res = SZ_ERROR_FAIL;
+			APPLOG(Log::LOG_ERROR)("\n---unzip_7z_file: File_Close error --\n");
+			break;
+		}
+
+#ifdef USE_WINDOWS_FILE
+		if (SzBitWithVals_Check(&db.Attribs, i))
+			SetFileAttributesW(szFile, db.Attribs.Vals[i]);
+#endif
+		PostMessage(callback, Msg, nNotifyID, (LPARAM)pNotifyMsg);
+	}
+
+	IAlloc_Free(&allocImp, outBuffer);
+
+	SzArEx_Free(&db, &allocImp);
 	return res;
 }
 
 ///////////////////////////////////////////////////////////////////////////// 
-// º¯ÊıËµÃ÷: ¼ì²éÖ¸¶¨µÄÎÄ¼ş¼ĞÊÇ·ñ´æÔÚ ;
-// ²ÎÊıËµÃ÷: [in]£ºstrPath ¼ì²éµÄÎÄ¼ş¼Ğ (´Ë·½·¨»áÖ÷¶¯ÏòÂ·¾¶Ä©Î²Ìí¼Ó*.*) ;
-// ·µ»ØÖµ:BOOLÀàĞÍ,´æÔÚ·µ»ØTRUE,·ñÔòÎªFALSE ;
+// å‡½æ•°è¯´æ˜: æ£€æŸ¥æŒ‡å®šçš„æ–‡ä»¶å¤¹æ˜¯å¦å­˜åœ¨ ;
+// å‚æ•°è¯´æ˜: [in]ï¼šstrPath æ£€æŸ¥çš„æ–‡ä»¶å¤¹ (æ­¤æ–¹æ³•ä¼šä¸»åŠ¨å‘è·¯å¾„æœ«å°¾æ·»åŠ *.*) ;
+// è¿”å›å€¼:BOOLç±»å‹,å­˜åœ¨è¿”å›TRUE,å¦åˆ™ä¸ºFALSE ;
 ///////////////////////////////////////////////////////////////////////////// 
 BOOL CUnZip7z::FolderExist(std::wstring& strPath)
 {
@@ -320,7 +285,7 @@ BOOL CUnZip7z::FolderExist(std::wstring& strPath)
 	if ((hFind != INVALID_HANDLE_VALUE) &&
 		(wfd.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY) || (wfd.dwFileAttributes&FILE_ATTRIBUTE_ARCHIVE))
 	{
-		//Èç¹û´æÔÚ²¢ÀàĞÍÊÇÎÄ¼ş¼Ğ ;
+		//å¦‚æœå­˜åœ¨å¹¶ç±»å‹æ˜¯æ–‡ä»¶å¤¹ ;
 		rValue = TRUE;
 	}
 
@@ -329,9 +294,9 @@ BOOL CUnZip7z::FolderExist(std::wstring& strPath)
 }
 
 ///////////////////////////////////////////////////////////////////////////// 
-// º¯ÊıËµÃ÷: ´´½¨¶à¼¶Ä¿Â¼ ;
-// ²ÎÊıËµÃ÷: [in]£º Â·¾¶×Ö·û´® ;
-// ·µ»ØÖµ: BOOL ³É¹¦True Ê§°ÜFalse ;///////////////////////////////////////////////////////////////////////////// 
+// å‡½æ•°è¯´æ˜: åˆ›å»ºå¤šçº§ç›®å½• ;
+// å‚æ•°è¯´æ˜: [in]ï¼š è·¯å¾„å­—ç¬¦ä¸² ;
+// è¿”å›å€¼: BOOL æˆåŠŸTrue å¤±è´¥False ;///////////////////////////////////////////////////////////////////////////// 
 BOOL CUnZip7z::CreatedMultipleDirectory(std::wstring Directoryname)
 {
 	if (Directoryname[Directoryname.length() - 1] != '\\')

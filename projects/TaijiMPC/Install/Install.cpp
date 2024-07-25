@@ -15,6 +15,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     TCHAR szSkinXML[16] = { 0 };
     _stprintf_s(szSkinXML, sizeof(szSkinXML) / sizeof(TCHAR) - 1, _T("%d"), IDR_MAIN_XML);
 
+    LCID systemLCID = GetSystemDefaultLCID();
+    SetThreadLocale(systemLCID);
+
     InstallXpress_Init_t init_t{
         hInstance,
         hPrevInstance,

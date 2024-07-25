@@ -7,6 +7,7 @@ struct InstallXpress_Init_t;
 
 class CMainFrame final : public WindowImplBase
 {
+    unsigned _UnzipFileAsyncThread(void* param);
 public:
 	CMainFrame(InstallXpress_Init_t* init_t);
 	~CMainFrame();
@@ -30,10 +31,10 @@ public:
 	void WindowInitialized();
 	void _OnClickBtn(TNotifyUI &msg);
 	void _OnSelChanged(TNotifyUI &msg);
-	bool CheckInstallSize();
 	void InstallSetup();
-	void InstallZip();
-	void UpdateProcess(int nprocess);
+	int  UnzipFileAsync(unsigned resourceId, const std::wstring& strUnzipDir, int nNotifyID);
+	int  UnzipFileAsync(const std::wstring& strZipFile, const std::wstring& strUnzipDir, int nNotifyID);
+	void InstallZip(UINT nResourceID, const std::wstring& strUnzipDir, int nNotifyID);
 	void SplitStringW(const WCHAR *pSrc, WCHAR chMark, std::vector<std::wstring> &vecStrings, BOOL bOnce);
 	
 public:
@@ -46,8 +47,6 @@ public:
 private: 
     InstallXpress_Init_t* m_pInit;
 	bool m_bcloseInstall;
-	int  m_nZipFileNum;
-	int  m_nProcess;
 	std::wstring m_strCompanyDir;
 	std::wstring m_strAppExePath;
 

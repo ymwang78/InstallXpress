@@ -145,6 +145,43 @@ DWORD ExecuteProcess(const wchar_t* cmd, bool hidden, int wait_second)
 }
 
 extern "C"
+BOOL DeleteDirectory(const TCHAR* dirPath) 
+{
+    std::wstring searchPath = std::wstring(dirPath) + L"\\*";
+    WIN32_FIND_DATA findData;
+    HANDLE hFind = FindFirstFile(searchPath.c_str(), &findData);
+
+    if (hFind == INVALID_HANDLE_VALUE) {
+        return FALSE;
+    }
+
+    do {
+        if (wcscmp(findData.cFileName, L".") != 0 && wcscmp(findData.cFileName, L"..") != 0) {
+            std::wstring filePath = std::wstring(dirPath) + L"\\" + findData.cFileName;
+
+            if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+                if (!DeleteDirectory(filePath.c_str())) {
+                    FindClose(hFind);
+                    return FALSE;
+                }
+            }
+            else {
+                SetFileAttributes(filePath.c_str(), FILE_ATTRIBUTE_NORMAL);
+                if (!DeleteFile(filePath.c_str())) {
+                    FindClose(hFind);
+                    return FALSE;
+                }
+            }
+        }
+    } while (FindNextFile(hFind, &findData) != 0);
+
+    FindClose(hFind);
+
+    SetFileAttributes(dirPath, FILE_ATTRIBUTE_NORMAL);
+    return RemoveDirectory(dirPath) != 0;
+}
+
+extern "C"
 int InstallXpress_WinMain(InstallXpress_Init_t* init_t)
 {
     ::CoInitialize(NULL);
@@ -164,7 +201,7 @@ int InstallXpress_WinMain(InstallXpress_Init_t* init_t)
 
     CMainFrame* pMainFrame = new CMainFrame(init_t);
 
-    Clog::open((pMainFrame->DirUtility().CompanyName() + L"_" + pMainFrame->DirUtility().ProductName() + L"_install.log").c_str(), Log::ERRORLOG);
+    Clog::open(pMainFrame->DirUtility().CompanyName().c_str(), (pMainFrame->DirUtility().ProductName() + L"_install.log").c_str(), Log::LOG_TRACE);
 
     if (pMainFrame) {
         pMainFrame->Create(NULL, init_t->szTitle, UI_CLASSSTYLE_DIALOG, WS_EX_STATICEDGE | WS_EX_APPWINDOW, 0, 0, 0, 0);

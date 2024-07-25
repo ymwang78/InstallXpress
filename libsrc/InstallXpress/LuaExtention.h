@@ -349,6 +349,8 @@ public:
 
     void OnSelChanged(const std::string& strButtonName, bool isSelected);
 
+    void OnUnzipProgress(int nNotifyID, unsigned nFileNum, unsigned nCurFileIndex, unsigned long long i64TotalSize, unsigned long long iCurSize);
+
     void ResetInstallPath(const std::string& strInstallPath);
 
     void PostSetup();

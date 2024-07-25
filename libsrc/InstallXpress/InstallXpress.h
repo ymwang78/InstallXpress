@@ -16,6 +16,8 @@ extern "C" {
 
     DWORD ExecuteProcess(const wchar_t* cmd, bool hidden, int wait_second);
 
+    BOOL DeleteDirectory(const TCHAR* dirPath);
+
     struct InstallXpress_Init_t
     {
         HINSTANCE hInstance;
