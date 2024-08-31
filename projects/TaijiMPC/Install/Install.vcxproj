@@ -180,9 +180,13 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Install.lua" />
+    <None Include="res\Install.7z" />
   </ItemGroup>
   <ItemGroup>
     <Xml Include="res\InstallDialog.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="res\Install.exe.manifest" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
