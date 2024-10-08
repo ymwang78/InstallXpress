@@ -74,6 +74,7 @@
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)obj\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
+    <GenerateManifest>false</GenerateManifest>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
@@ -110,6 +111,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -153,6 +155,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <Text Include="res\UserLicense.txt" />
     <Text Include="res\许可协议.txt" />
   </ItemGroup>
   <ItemGroup>
@@ -175,6 +178,7 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="Install.ico" />
+    <Image Include="res\background.png" />
     <Image Include="res\loginlogo.png" />
     <Image Include="res\setup.png" />
   </ItemGroup>
@@ -184,6 +188,7 @@
   </ItemGroup>
   <ItemGroup>
     <Xml Include="res\InstallDialog.xml" />
+    <Xml Include="res\InstallDialog_en.xml" />
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="res\Install.exe.manifest" />

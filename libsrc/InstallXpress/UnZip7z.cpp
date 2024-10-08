@@ -118,7 +118,7 @@ int CUnZip7z::getunzipfilenum(ResourceHandler* resHandler)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // 
-int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, std::wstring &mUnPackPath, HWND callback, UINT Msg, UINT nNotifyID)
+int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, const std::wstring &mUnPackPath, HWND callback, UINT Msg, UINT nNotifyID)
 {
 	LPCTSTR lpszOutputPath = mUnPackPath.c_str();
 	if (!FolderExist(mUnPackPath)) {
@@ -267,7 +267,7 @@ int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, std::wstring &mUnPackPa
 // 参数说明: [in]：strPath 检查的文件夹 (此方法会主动向路径末尾添加*.*) ;
 // 返回值:BOOL类型,存在返回TRUE,否则为FALSE ;
 ///////////////////////////////////////////////////////////////////////////// 
-BOOL CUnZip7z::FolderExist(std::wstring& strPath)
+BOOL CUnZip7z::FolderExist(const std::wstring& strPath)
 {
 	std::wstring sCheckPath = strPath;
 

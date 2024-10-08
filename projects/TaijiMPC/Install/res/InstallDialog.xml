@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Window size="600,380" mininfo="600,380" maxinfo="600,428" caption="0,0,0,380" roundcorner="6,6,6,6" showshadow="true" shadowsize="3" shadowpositon="1,1" shadowcolor="#00666666">
+<Window size="600,380" mininfo="600,380" maxinfo="600,428" caption="0,0,0,380" roundcorner="20,20" showshadow="true" shadowsize="3" shadowpositon="1,1" shadowcolor="#00666666">
 <Default name="Option" value="align=&quot;left&quot; height=&quot;18&quot; textcolor=&quot;#FF7F7F7F&quot; font=&quot;0&quot; textpadding=&quot;22,0,0,0&quot; normalimage=&quot;res='130' restype='png' source='618,0,636,18' dest='0,0,18,18'&quot; hotimage=&quot;res='130' restype='png' source='618,0,636,18' dest='0,0,18,18'&quot; pushedimage=&quot;res='130' restype='png' source='600,0,618,18' dest='0,0,18,18'&quot; selectedimage=&quot;res='130' restype='png' source='600,0,618,18' dest='0,0,18,18'&quot;"/>
 <Default name="VScrollBar" value="thumbnormalimage=&quot;res='130' restype='png' source='700,0,710,20' corner='0,5,0,5'&quot; thumbhotimage=&quot;res='130' restype='png' source='710,0,720,20' corner='0,5,0,5'&quot; thumbpushedimage=&quot;res='130' restype='png' source='720,0,730,20' corner='0,5,0,5'&quot; bkpushedimage=&quot;res='130' restype='png' source='730,0,740,20' corner='0,5,0,5'&quot; bkhotimage=&quot;file='scrollbk.png' source='0,0,10,20' corner='0,4,0,4'&quot; width=&quot;10&quot; showbutton1=&quot;false&quot; showbutton2=&quot;false&quot;"/>
 <Font name="微软雅黑" size="12" default="true"/>
@@ -7,13 +7,13 @@
 <Font name="微软雅黑" size="22"/>
 <Font name="微软雅黑" size="40" bold="true"/>
 <Font name="微软雅黑" size="16"/>
-	<VerticalLayout name="mainlayout" bkimage="res='130' restype='png' source='0,0,600,220' corner='300,208,300,5'">
-		<HorizontalLayout height="40" inset="10,8,10,0">
-			<Label name="piupiulogo" bkimage="res='132' restype='png'" width="24" height="20"/>
+	<VerticalLayout name="mainlayout" bkimage="res='138' restype='png' source='0,0,600,220' corner='300,208,5,5'" >
+		<HorizontalLayout height="40" inset="400,8,10,0">
+			<Label name="logo" bkimage="res='132' restype='png'" width="24" height="24"/>
 			<Label name="titletext" text="泰极MPC安装程序" textcolor="#FFFFFFFF" font="1" height="20" textpadding="10,0,0,0"/>
 			<Button name="closebtn" width="22" height="22" normalimage="res='130' restype='png' source='600,18,622,40'" hotimage="res='130' restype='png' source='622,18,644,40'" pushedimage="res='130' restype='png' source='644,18,666,40'"/>
 		</HorizontalLayout>
-		<TabLayout name="installlayout" selectedid="0">	
+		<TabLayout name="installlayout" selectedid="0">
 			<VerticalLayout name="initlayout">				
 				<VerticalLayout>
 					<Button name="starinstallbtn" width="200" height="50" font="2" textcolor="#FFFFFFFF" normalimage="res='130' restype='png' source='0,220,200,270' corner='5,5,5,5'" hotimage="res='130' restype='png' source='200,220,400,270' corner='5,5,5,5'" pushedimage="res='130' restype='png' source='400,220,600,270' corner='5,5,5,5'" disabledimage="res='130' restype='png' source='600,220,800,270' corner='5,5,5,5'" float="true" pos="200,200,0,0"/>
@@ -42,8 +42,8 @@
 			<Button name="custombtn" text="自定义安装" font="0" align="right" width="72" height="18" textcolor="#FF7F7F7F" hottextcolor="#FF999999"/>
 		</HorizontalLayout>
 		<HorizontalLayout height="48" name="customlayout" inset="38,10,21,0" bkcolor="#FFF8F8F8" visible="false">
-			<Text name="pahttext" text="选择安装位置" textcolor="#FFB4B4B4" textpadding="10,5,0,0" font="0" height="38" width="116" align="center"/>		
-			<Edit name="pathedit" textcolor="#FFB4B4B4" font="0" text="" width="264" height="30" textpadding="16,0,16,0" normalimage="res='130' restype='png' source='600,40,640,70' corner='11,15,11,15'" hotimage="res='130' restype='png' source='600,40,640,70' corner='11,15,11,15'" focusedimage="res='130' restype='png' source='600,40,640,70' corner='11,15,11,15'" borderround="24,24" readonly="true"/>
+			<Text name="pahttext" text="选择安装位置" textcolor="#FF7F7F7F" textpadding="10,5,0,0" font="0" height="38" width="116" align="center"/>		
+			<Edit name="pathedit" textcolor="#FF7F7F7F" font="0" text="" width="264" height="30" textpadding="16,0,16,0" normalimage="res='130' restype='png' source='600,40,640,70' corner='11,15,11,15'" hotimage="res='130' restype='png' source='600,40,640,70' corner='11,15,11,15'" focusedimage="res='130' restype='png' source='600,40,640,70' corner='11,15,11,15'" borderround="24,24" readonly="true"/>
 			<Control name="spacecontrol2" width="18"/>
 			<Button name="browfilebtn" width="100" height="30" normalimage="res='130' restype='png' source='600,70,700,100'" hotimage="res='130' restype='png' source='600,100,700,130'" pushedimage="res='130' restype='png' source='600,130,700,160'" disabledimage="res='130' restype='png' source='600,160,700,190'"/>
 		</HorizontalLayout>		

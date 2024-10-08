@@ -21,12 +21,12 @@ public:
 
 public:
 	BOOL CreatedMultipleDirectory(std::wstring Directoryname);
-	BOOL FolderExist(std::wstring& strPath);
+	BOOL FolderExist(const std::wstring& strPath);
 
 public:
 	unsigned long long GetTotalSize(const CSzArEx* db);
 	int cat_path(LPTSTR lpszPath, LPCWSTR lpSubPath);
 	int save_file(LPCTSTR lpszFile, const void * lpBuf, DWORD dwSize);
-	int unzip_7z_file(ResourceHandler* resHandler, std::wstring &mUnPackPath, HWND callback, UINT Msg, UINT nNotifyID);
+	int unzip_7z_file(ResourceHandler* resHandler,const std::wstring &mUnPackPath, HWND callback, UINT Msg, UINT nNotifyID);
 	int getunzipfilenum(ResourceHandler* resHandler);
 };

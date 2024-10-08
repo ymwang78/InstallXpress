@@ -15,7 +15,12 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="res\许可协议.txt" />
+    <Text Include="res\UserLicense.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="res\许可协议.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">
@@ -54,9 +59,15 @@
     <Image Include="res\loginlogo.png">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="res\background.png">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <Xml Include="res\InstallDialog.xml">
+      <Filter>Resource Files</Filter>
+    </Xml>
+    <Xml Include="res\InstallDialog_en.xml">
       <Filter>Resource Files</Filter>
     </Xml>
   </ItemGroup>

@@ -45,7 +45,7 @@ local _dirExeFullPath = _dirCompany .. "\\TaiJiMPC5\\TaiJiMPC.exe"
 local _bCustomPath = false
 
 local _strResourceCN = {
-	SETUP = "安装程序",
+	SETUP = "泰极MPC安装程序",
 	CHOOSE_INSTALL_PATH = "选择安装路径",
 	LICENSE = "安装许可协议",
 	SPACE_NOT_ENOUGH = "系统空间不足",
@@ -108,7 +108,7 @@ function OnButtonClick(btnName)
             installx.DuiVisible("custombtn", true)
             installx.DuiText("titletext", _strResource.SETUP)
             installx.DuiTextColor("titletext", 0xFFFFFFFF)
-            installx.DuiSetBkImage("mainlayout", "res='130' restype='png' source='0,0,600,220' corner='300,208,300,5'")
+            installx.DuiSetBkImage("mainlayout", "res='138' restype='png' source='0,0,600,221' corner='300,208,5,5'")
         else
             installx.DuiMessage(0x10, 0, 0) -- WM_CLOSE
         end
@@ -119,7 +119,7 @@ function OnButtonClick(btnName)
         installx.DuiTabSelect("installlayout", 1)
         installx.DuiVisible("custombtn", false)
         installx.DuiText("titletext", _strResource.LICENSE)
-        installx.DuiTextColor("titletext", 0xFF3B3B3B)
+        installx.DuiTextColor("titletext", 0xFF5DA5FF)
         installx.DuiText("portcontent", 133) -- IDR_REGCONTENT1
         installx.DuiSetBkImage("mainlayout", "res='130' restype='png' source='20,210,80,216'")
     elseif (btnName == "starinstallbtn") then
@@ -138,8 +138,19 @@ function OnSelChanged(btnName, isSelected)
     end
 end
 
+local _image_index = 0
 function OnUnzipProgress(nNotifyID, nTotalFileNum, nCurFileIndex, nTotalSize, nCurrentSize)
 	local percent = 5 + math.floor(90 * nCurFileIndex / nTotalFileNum)
+	if _image_index == 2 and  percent > 80 then
+		_image_index = 3
+		installx.DuiSetBkImage("mainlayout", "res='138' restype='png' source='0,666,600,886' corner='300,208,5,5'")
+	elseif _image_index == 1 and percent > 50 then
+		_image_index = 2
+		installx.DuiSetBkImage("mainlayout", "res='138' restype='png' source='0,444,600,664' corner='300,208,5,5'")
+	elseif _image_index == 0 and percent > 20 then
+		_image_index = 1
+		installx.DuiSetBkImage("mainlayout", "res='138' restype='png' source='0,222,600,442' corner='300,208,5,5'")
+	end
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
 end
 
@@ -177,7 +188,7 @@ function KillProcesses()
     installx.ProcessKill("TaiJiOPCSim.exe")
 
 	installx.LogPrint("Stop Service HostVM ...")
-    installx.ProcessExecute(_dirCompany .. "\\HostVM\\HostVM.exe --stop HostVM")
+    installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" --stop HostVM")
 
 	installx.LogPrint("KillProcesses HostVM.exe ...")
     installx.ProcessKill("HostVM.exe")
@@ -226,18 +237,18 @@ function PostSetup()
     local opcEnum = installx.RegGetValue(HRootKey.HKEY_CLASSES_ROOT, "CLSID\\{13486D50-4821-11D2-A494-3CB306C10000}", "")
         or installx.RegGetValue(HRootKey.HKEY_CLASSES_ROOT, "WOW6432Node\\CLSID\\{13486D50-4821-11D2-A494-3CB306C10000}", "")
     if (opcEnum == nil or opcEnum == False) then
-        installx.ProcessExecute(_dirCompany .. "\\Common\\opc\\GBDA_Install_Prereq_x86.msi /quiet")
+        installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\opc\\GBDA_Install_Prereq_x86.msi\" /quiet")
     end
 
 	local percent = 96
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
 
-    installx.ProcessExecute("msiexec /i " .. _dirCompany .. "\\Common\\opc\\GBDA_Install_Prereq_x86.msi /qn")
-    installx.ProcessExecute(_dirCompany .. "\\TaiJiOPCSim\\bin\\TaiJiOPCSim.exe -RegServer")
+    installx.ProcessExecute("msiexec /i \"" .. _dirCompany .. "\\Common\\opc\\GBDA_Install_Prereq_x86.msi\" /qn")
+    installx.ProcessExecute("\"" .. _dirCompany .. "\\TaiJiOPCSim\\bin\\TaiJiOPCSim.exe\" -RegServer")
 
     local haspVersion = installx.RegGetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Aladdin Knowledge Systems\\HASP\\Driver\\Installer", "DrvPkgVersion")
     if (haspVersion == nil or haspVersion < "8.31") then --os.execute
-        installx.ProcessExecute(_dirCompany .. "\\Common\\hasp\\haspdinst.exe -install -nomsg")
+        installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\hasp\\haspdinst.exe\" -install -nomsg")
     end
 
 	local percent = 97
@@ -257,8 +268,8 @@ function PostSetup()
 	local percent = 98
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
 
-    installx.ProcessExecute(_dirCompany .. "\\HostVM\\HostVM.exe --install HostVM")
-    installx.ProcessExecute(_dirCompany .. "\\HostVM\\HostVM.exe --start HostVM")
+    installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" --install HostVM")
+    installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" --start HostVM")
 
 	local percent = 99
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )

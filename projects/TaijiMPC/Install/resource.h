@@ -20,6 +20,7 @@
 #define IDR_INSTALLSOFT1                134
 #define IDR_LUA_SCRIPT                  135
 #define IDR_MANIFEST1                   137
+#define IDB_RES_BACKGROUND              138
 #define IDC_STATIC                      -1
 
 // Next default values for new objects

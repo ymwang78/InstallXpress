@@ -40,8 +40,6 @@ CMainFrame::CMainFrame(InstallXpress_Init_t* init_t)
     , m_luaPtr(0)
 {
     _sglMainFrame = this;
-	m_strCompanyDir = _T("");
-
 }
 
 CMainFrame::~CMainFrame()
@@ -230,12 +228,6 @@ void CMainFrame::WindowInitialized()
 	m_pTipLabel = static_cast<CLabelUI*>(m_PaintManager.FindControl(_T("errortiplab")));
 	m_pCloseBtn = static_cast<CButtonUI*>(m_PaintManager.FindControl(_T("closebtn")));
 	m_pProgress = static_cast<CProgressUI*>(m_PaintManager.FindControl(_T("installprogress")));
-
-	wchar_t fullHomePath[MAX_PATH] = { 0 };
-	m_strCompanyDir = Utf82Unicode(m_luaPtr->QueryByKey_String("InstallPath"));
-    _tfullpath(fullHomePath + _tcslen(fullHomePath), m_strCompanyDir.c_str(), sizeof(fullHomePath) / sizeof(fullHomePath[0]));
-	m_strCompanyDir = fullHomePath;	
-
 	//if (m_bupdate) InstallSetup(); //更新直接安装;
 }
 
@@ -330,7 +322,7 @@ void CMainFrame::InstallZip(UINT nResourceID, const std::wstring& strUnzipDir, i
             return;
         CUnZip7z unzip7z;
 
-		int ret = unzip7z.unzip_7z_file(pInstallContent, m_strCompanyDir, this->GetHWND(), WM_INSTALLPROGRES_MSG, nNotifyID);
+		int ret = unzip7z.unzip_7z_file(pInstallContent, strUnzipDir, this->GetHWND(), WM_INSTALLPROGRES_MSG, nNotifyID);
         if (ret == 0) 
 			continue;
         APPLOG(Log::LOG_ERROR)("\n---Install: 解压失败 ret:%d---\n", ret);

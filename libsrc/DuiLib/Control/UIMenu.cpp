@@ -426,7 +426,7 @@ namespace DuiLib
 	LRESULT CMenuWnd::OnSize(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled)
 	{
 		SIZE szRoundCorner = m_pm.GetRoundCorner();
-		if (!::IsIconic(*this))
+		if (!::IsIconic(*this) && szRoundCorner.cx && szRoundCorner.cy)
 		{
 			CDuiRect rcWnd;
 			::GetWindowRect(*this, &rcWnd);

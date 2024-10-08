@@ -45,25 +45,25 @@ const HKEY _hRootKeyID[] = {
 };
 
 // 跨平台mkdir函数
-inline int portable_mkdir(const char* path) {
+inline int portable_mkdir(const TCHAR* path) {
 #ifdef _WIN32
-    return _mkdir(path);
+    return _wmkdir(path);
 #else 
     return mkdir(path, 0755); // 使用Unix/Linux权限模式
 #endif
 }
 
-bool mkdir_p(const std::string& path) {
+bool mkdir_p(const std::wstring& path) {
     size_t pos = 0;
-    std::string currentPath;
-    std::string delimiter = "/";
+    std::wstring currentPath;
+    std::wstring delimiter = L"/";
 
 #ifdef _WIN32
-    delimiter = "\\";
+    delimiter = L"\\";
 #endif
 
     // 去除路径末尾的分隔符
-    std::string normalizedPath = path;
+    std::wstring normalizedPath = path;
     if (normalizedPath.back() == delimiter.back()) {
         normalizedPath.pop_back();
     }
@@ -558,7 +558,7 @@ static int l_FilePathDelete(lua_State * L)
         lua_pushboolean(L, false);
         return 1;
     }
-    DWORD attributes = GetFileAttributesA(path);
+    DWORD attributes = GetFileAttributes(Utf82Unicode(path).c_str());
 
     if (attributes == INVALID_FILE_ATTRIBUTES) {
         lua_pushboolean(L, false);
@@ -590,7 +590,7 @@ static int l_FilePathExists(lua_State * L)
         lua_pushboolean(L, false);
         return 1;
     }
-    DWORD attributes = GetFileAttributesA(path);
+    DWORD attributes = GetFileAttributes(Utf82Unicode(path).c_str());
     if (attributes == INVALID_FILE_ATTRIBUTES) {
         lua_pushboolean(L, false);
         return 1;
@@ -632,7 +632,7 @@ static int l_FilePathMakeDir(lua_State * L)
         lua_pushboolean(L, false);
         return 1;
     }
-    if (mkdir_p(path)) {
+    if (mkdir_p(Utf82Unicode(path).c_str())) {
         lua_pushboolean(L, true);
         return 1;
     }
@@ -714,7 +714,7 @@ static int l_ProcessExecute(lua_State * L)
     if (lua_isinteger(L, 3))
         wait_sec = (int)lua_tointeger(L, 3);
 
-    APPLOG(LOG_TRACE)("%s: %s\n", "ProcessExecute", cmd);
+    APPLOG(LOG_TRACE)("%s: %s\n", "ProcessExecute", strCommand);
 
     if (cmd == nullptr) {
         lua_pushboolean(L, false);

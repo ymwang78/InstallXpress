@@ -41,13 +41,11 @@ public:
 	static	unsigned int _stdcall InstallThread(void* param);
 	ResourceHandler* LoadResourceFile(UINT uId, LPCTSTR strName);
 	const CDirUtility& DirUtility() const { return m_dirUtility; }
-	const std::wstring& CompanyDir() const { return m_strCompanyDir; }
 	CPaintManagerUI& PaintManager() { return m_PaintManager; }
 
 private: 
     InstallXpress_Init_t* m_pInit;
 	bool m_bcloseInstall;
-	std::wstring m_strCompanyDir;
 	std::wstring m_strAppExePath;
 
 	CDirUtility  m_dirUtility;
