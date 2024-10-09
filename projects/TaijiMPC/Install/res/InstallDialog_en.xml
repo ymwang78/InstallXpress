@@ -1,0 +1,51 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Window size="600,380" mininfo="600,380" maxinfo="600,428" caption="0,0,0,380" roundcorner="20,20" showshadow="true" shadowsize="3" shadowpositon="1,1" shadowcolor="#00666666">
+<Default name="Option" value="align=&quot;left&quot; height=&quot;18&quot; textcolor=&quot;#FF7F7F7F&quot; font=&quot;0&quot; textpadding=&quot;22,0,0,0&quot; normalimage=&quot;res='130' restype='png' source='618,0,636,18' dest='0,0,18,18'&quot; hotimage=&quot;res='130' restype='png' source='618,0,636,18' dest='0,0,18,18'&quot; pushedimage=&quot;res='130' restype='png' source='600,0,618,18' dest='0,0,18,18'&quot; selectedimage=&quot;res='130' restype='png' source='600,0,618,18' dest='0,0,18,18'&quot;" />
+<Default name="VScrollBar" value="thumbnormalimage=&quot;res='130' restype='png' source='700,0,710,20' corner='0,5,0,5'&quot; thumbhotimage=&quot;res='130' restype='png' source='710,0,720,20' corner='0,5,0,5'&quot; thumbpushedimage=&quot;res='130' restype='png' source='720,0,730,20' corner='0,5,0,5'&quot; bkpushedimage=&quot;res='130' restype='png' source='730,0,740,20' corner='0,5,0,5'&quot; bkhotimage=&quot;file='scrollbk.png' source='0,0,10,20' corner='0,4,0,4'&quot; width=&quot;10&quot; showbutton1=&quot;false&quot; showbutton2=&quot;false&quot;" />
+<Font name="Times New Roman" size="12" default="true" />
+<Font name="Times New Roman" size="14" />
+<Font name="Times New Roman" size="22" />
+<Font name="Times New Roman" size="40" bold="true" />
+<Font name="Times New Roman" size="16" />
+	<VerticalLayout name="mainlayout" bkimage="res='138' restype='png' source='0,0,600,220' corner='300,208,5,5'">
+		<HorizontalLayout height="40" inset="300,8,10,0">
+			<Label name="logo" bkimage="res='132' restype='png'" width="24" height="24" />
+			<Label name="titletext" text="Taiji MPC Installation Program" textcolor="#FFFFFFFF" font="1" height="20" textpadding="10,0,0,0" />
+			<Button name="closebtn" width="22" height="22" normalimage="res='130' restype='png' source='600,18,622,40'" hotimage="res='130' restype='png' source='622,18,644,40'" pushedimage="res='130' restype='png' source='644,18,666,40'" />
+		</HorizontalLayout>
+		<TabLayout name="installlayout" selectedid="0">
+			<VerticalLayout name="initlayout">				
+				<VerticalLayout>
+					<Button name="starinstallbtn" width="200" height="50" font="2" textcolor="#FFFFFFFF" normalimage="res='130' restype='png' source='0,220,200,270' corner='5,5,5,5'" hotimage="res='130' restype='png' source='200,220,400,270' corner='5,5,5,5'" pushedimage="res='130' restype='png' source='400,220,600,270' corner='5,5,5,5'" disabledimage="res='130' restype='png' source='600,220,800,270' corner='5,5,5,5'" float="true" pos="200,200,0,0" />
+					<Progress name="installprogress" width="200" height="50" text="Loading" align="center" textpadding="0,10,0,0" font="2" textcolor="#FFFF00FF" float="true" pos="200,200,0,0" bkimage="res='130' restype='png' source='100,370,200,420' corner='25,25,25,25'" foreimage="res='130' restype='png' source='0,370,100,420' corner='25,25,25,25'" visible="false" />
+					<Button name="starusebtn" width="200" height="50" font="2" textcolor="#FFFFFFFF" normalimage="res='130' restype='png' source='0,270,200,320' corner='5,5,5,5'" hotimage="res='130' restype='png' source='200,270,400,320' corner='5,5,5,5'" pushedimage="res='130' restype='png' source='400,270,600,320' corner='5,5,5,5'" disabledimage="res='130' restype='png' source='600,270,800,320' corner='5,5,5,5'" float="true" pos="200,200,0,0" visible="false" />
+					<Label name="errortiplab" align="center" text="" textcolor="#FFFF0000" height="24" width="540" float="true" pos="20,260,0,0" />				
+				</VerticalLayout>				
+				<HorizontalLayout height="70" name="finishlayout" inset="60,1,0,0" visible="false">
+					<Option name="bootstartbtn" width="86" text="Startup on Boot" selected="false" />
+					<Control name="opsep1" width="24" />
+					<Option name="runbtn" width="86" text="Start Now" selected="true" />
+					<Control name="opsep2" width="24" />
+					<Option name="pyenvbtn" width="136" text="Set Python Env" selected="false" />
+					<Control name="opsep3" width="24" />
+					<Option name="showtxbtn" width="86" text="Show New Features" selected="false" />					
+				</HorizontalLayout>
+			</VerticalLayout>
+			<VerticalLayout name="installprotlayout" inset="24,6,24,6">
+				<RichEdit name="portcontent" inset="2,2,2,2" textpadding="8,6,6,6" bkcolor="#FFFFFFFF" height="270" text="" textcolor="#00000000" multiline="true" rich="false" readonly="true" bordersize="1" bordercolor="#FFEEEEEE" vscrollbar="true" />
+			</VerticalLayout>			
+		</TabLayout>
+		<HorizontalLayout height="56" inset="21,14,20,0" name="sureportlayout">
+			<Option name="protcheckbtn" width="80" text="I agree" selected="true" />
+			<Button name="lookprotbtn" text="License Agreement" font="0" align="center" textcolor="#FF5DA5FF" width="110" height="18" hottextcolor="#FF5DB5FF" />
+			<Control name="spacecontrol" />	
+			<Button name="custombtn" text="Custom Installation" font="0" align="right" width="150" height="18" textcolor="#FF7F7F7F" hottextcolor="#FF999999" />
+		</HorizontalLayout>
+		<HorizontalLayout height="48" name="customlayout" inset="38,10,21,0" bkcolor="#FFF8F8F8" visible="false">
+			<Text name="pahttext" text="Install Location" textcolor="#FF7F7F7F" textpadding="10,5,0,0" font="0" height="38" width="116" align="center" />		
+			<Edit name="pathedit" textcolor="#FF7F7F7F" font="0" text="" width="264" height="30" textpadding="16,0,16,0" normalimage="res='130' restype='png' source='600,40,640,70' corner='11,15,11,15'" hotimage="res='130' restype='png' source='600,40,640,70' corner='11,15,11,15'" focusedimage="res='130' restype='png' source='600,40,640,70' corner='11,15,11,15'" borderround="24,24" readonly="true" />
+			<Control name="spacecontrol2" width="18" />
+			<Button name="browfilebtn" width="100" height="30" normalimage="res='130' restype='png' source='600,70,700,100'" hotimage="res='130' restype='png' source='600,100,700,130'" pushedimage="res='130' restype='png' source='600,130,700,160'" disabledimage="res='130' restype='png' source='600,160,700,190'" />
+		</HorizontalLayout>		
+	</VerticalLayout>
+</Window>
