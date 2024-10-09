@@ -121,7 +121,7 @@ function OnButtonClick(btnName)
         installx.DuiText("titletext", _strResource.LICENSE)
         installx.DuiTextColor("titletext", 0xFF5DA5FF)
         installx.DuiText("portcontent", 133) -- IDR_REGCONTENT1
-        installx.DuiSetBkImage("mainlayout", "res='130' restype='png' source='20,210,80,216'")
+        installx.DuiSetBkImage("mainlayout", "res='138' restype='png' source='20,210,80,216'")
     elseif (btnName == "starinstallbtn") then
         StartSetup()
     elseif (btnName == "starusebtn") then

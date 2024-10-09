@@ -62,6 +62,9 @@
     <Image Include="res\background.png">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="res\setupEn.png">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <Xml Include="res\InstallDialog.xml">

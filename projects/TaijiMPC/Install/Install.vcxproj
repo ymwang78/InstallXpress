@@ -181,6 +181,7 @@
     <Image Include="res\background.png" />
     <Image Include="res\loginlogo.png" />
     <Image Include="res\setup.png" />
+    <Image Include="res\setupEn.png" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Install.lua" />

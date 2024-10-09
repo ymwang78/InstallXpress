@@ -32,7 +32,7 @@
 				</HorizontalLayout>
 			</VerticalLayout>
 			<VerticalLayout name="installprotlayout" inset="24,6,24,6">
-				<RichEdit name="portcontent" inset="2,2,2,2" textpadding="8,6,6,6" bkcolor="#FFFFFFFF" height="270" text="" textcolor="#FFA4A4A4" multiline="true" rich="false" readonly="true" bordersize="1" bordercolor="#FFEEEEEE" vscrollbar="true"/>
+				<RichEdit name="portcontent" inset="2,2,2,2" textpadding="8,6,6,6" bkcolor="#FFFFFFFF" height="270" text="" textcolor="#000000" multiline="true" rich="false" readonly="true" bordersize="1" bordercolor="#FFEEEEEE" vscrollbar="true"/>
 			</VerticalLayout>			
 		</TabLayout>
 		<HorizontalLayout height="56" inset="21,14,20,0" name="sureportlayout">
