@@ -20,7 +20,7 @@
 					<Progress name="installprogress" width="200" height="50" text="正在载入" align="center" textpadding="0,10,0,0" font="2" textcolor="#FFFF00FF" float="true" pos="200,200,0,0" bkimage="res='130' restype='png' source='100,370,200,420' corner='25,25,25,25'" foreimage="res='130' restype='png' source='0,370,100,420' corner='25,25,25,25'" visible="false"/>
 					<Button name="starusebtn" width="200" height="50" font="2" textcolor="#FFFFFFFF" normalimage="res='130' restype='png' source='0,270,200,320' corner='5,5,5,5'" hotimage="res='130' restype='png' source='200,270,400,320' corner='5,5,5,5'" pushedimage="res='130' restype='png' source='400,270,600,320' corner='5,5,5,5'" disabledimage="res='130' restype='png' source='600,270,800,320' corner='5,5,5,5'" float="true" pos="200,200,0,0" visible="false"/>
 					<Label name="errortiplab" align="center" text="" textcolor="#FFFF0000" height="24" width="540" float="true" pos="20,260,0,0"/>				
-				</VerticalLayout>				
+				</VerticalLayout>
 				<HorizontalLayout height="70" name="finishlayout" inset="60,1,0,0" visible="false">
 					<Option name="bootstartbtn" width="86" text="开机启动" selected="false"/>
 					<Control name="opsep1" width="24"/>

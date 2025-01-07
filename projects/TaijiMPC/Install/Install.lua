@@ -1,4 +1,4 @@
-﻿local HRootKey = {
+local HRootKey = {
     HKEY_CLASSES_ROOT = 0,
     HKEY_CURRENT_USER = 1,
     HKEY_LOCAL_MACHINE = 2,
@@ -166,7 +166,7 @@ function CheckDiskSpace()
         ErrorHint(_strResource.SPACE_NOT_ENOUGH)
         return false
     end
-    freeSpace = installx.DiskFreeSpace(_dirCompany)
+    freeSpace = installx.DiskFreeSpace(_dirCompany) or 500 * 1024 * 1024
     if (freeSpace < 500 * 1024 * 1024) then
         ErrorHint(_strResource.SPACE_HINT)
         return false
@@ -234,6 +234,9 @@ function PostSetup()
 	local percent = 95
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
 
+	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" --stop HostVM")
+	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" --uninstall HostVM")
+
     local opcEnum = installx.RegGetValue(HRootKey.HKEY_CLASSES_ROOT, "CLSID\\{13486D50-4821-11D2-A494-3CB306C10000}", "")
         or installx.RegGetValue(HRootKey.HKEY_CLASSES_ROOT, "WOW6432Node\\CLSID\\{13486D50-4821-11D2-A494-3CB306C10000}", "")
     if (opcEnum == nil or opcEnum == False) then
@@ -245,6 +248,10 @@ function PostSetup()
 
     installx.ProcessExecute("msiexec /i \"" .. _dirCompany .. "\\Common\\opc\\GBDA_Install_Prereq_x86.msi\" /qn")
     installx.ProcessExecute("\"" .. _dirCompany .. "\\TaiJiOPCSim\\bin\\TaiJiOPCSim.exe\" -RegServer")
+
+	installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{A48A6241-A024-4f99-B105-5DF8CCEA66BA}\\Implemented Categories", "", "")
+	installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{A48A6241-A024-4f99-B105-5DF8CCEA66BA}\\Implemented Categories\\{63D5F430-CFE4-11d1-B2C8-0060083BA1FB}", "", "")
+	installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{A48A6241-A024-4f99-B105-5DF8CCEA66BA}\\Implemented Categories\\{63D5F432-CFE4-11d1-B2C8-0060083BA1FB}", "", "")
 
     local haspVersion = installx.RegGetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Aladdin Knowledge Systems\\HASP\\Driver\\Installer", "DrvPkgVersion")
     if (haspVersion == nil or haspVersion < "8.31") then --os.execute
@@ -267,7 +274,7 @@ function PostSetup()
 
 	local percent = 98
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
-
+    installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" --uninstall HostVM")
     installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" --install HostVM")
     installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" --start HostVM")
 
