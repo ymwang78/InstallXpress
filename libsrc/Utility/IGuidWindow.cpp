@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "IGuidWindow.h"
 
 #include <atlbase.h>

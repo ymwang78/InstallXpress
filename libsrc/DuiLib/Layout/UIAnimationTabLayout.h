@@ -1,8 +1,7 @@
-#ifndef __UIANIMATIONTABLAYOUT_H__
+﻿#ifndef __UIANIMATIONTABLAYOUT_H__
 #define __UIANIMATIONTABLAYOUT_H__
 
 #pragma once
-using namespace std;
 
 namespace DuiLib
 {

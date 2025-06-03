@@ -1,0 +1,154 @@
+# Python
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.env/
+.venv/
+env.bak/
+venv.bak/
+.python-version
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+.project
+.pydevproject
+.settings/
+*.code-workspace
+.history/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Database
+*.sqlite3
+*.db
+*.sqlite
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+.BIN/
+*.lnk
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# C/C++
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.out
+*.app
+*.i
+*.ii
+*.gch
+*.pch
+*.s
+*.S
+*.asm
+*.ASM
+*.class
+*.jar
+*.war
+*.ear
+*.pdb
+*.bin
+*.tlog
+*.ilk
+*.pdb
+*.idb
+*.ipdb
+*.iobj
+*.cod
+*.7z
+*.aps
+Debug/
+Release/
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+!.cmake
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+*.VC.db
+*.VC.opendb
+*.VC.VC.opendb
+
+# Qt
+*.pro.user
+*.pro.user.*
+*.qmake.stash
+*.moc
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+.qmake.cache
+.qmake.stash
+*.prl
+*.qm
+*.ts
+*.tsx
+
+# Version Control
+*.scc
+*.vspscc
+*.sconsign.dblite
+*.old
+
+# My
+*.log
+bin/x64/debug/
+bin/x64/release/
+bin/Win32/debug/
+bin/Win32/release/

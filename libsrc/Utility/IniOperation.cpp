@@ -1,6 +1,6 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "IniOperation.h"
-
+using namespace std;
 /////////////////////////////CIniReader/////////////////////////////////////////////
 CIniReader::CIniReader(LPCTSTR szFileName)
 {

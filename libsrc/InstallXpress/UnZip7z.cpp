@@ -175,7 +175,9 @@ int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, const std::wstring &mUn
 			res = SzArEx_Extract(&db, &lookIn.vtbl, i, &blockIndex, &outBuffer, &outBufferSize,
 				&offset, &outSizeProcessed, &allocImp, &allocTempImp);
 			if (res != SZ_OK) {
-				APPLOG(Log::LOG_ERROR)("\n---unzip_7z_file: SzArEx_Extract error,error code : %d ---\n", res);
+                APPLOG(Log::LOG_ERROR)(
+                    "\n---unzip_7z_file: SzArEx_Extract error,error code : %d: %s ---\n", res,
+                    pNotifyMsg->szFileName);
 				break;
 			}
 			pNotifyMsg->currentSize += outSizeProcessed;

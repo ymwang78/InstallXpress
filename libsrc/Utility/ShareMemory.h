@@ -1,16 +1,16 @@
-#pragma once
+ï»¿#pragma once
 
 #include <string>
-using namespace std;
+
 
 struct stSharePiuInfo
 {
 	unsigned int iid;
 	HWND hwnd;
-	string strsession;
+    std::string strsession;
 	unsigned int npid;
 	int ndatalen;
-	string strdata;
+    std::string strdata;
 	stSharePiuInfo() :iid(0), hwnd(NULL), npid(0), strsession(""), ndatalen(0), strdata("") {};
 };
 
@@ -29,9 +29,9 @@ public:
 	~CShareMemory();
 
 
-	void* GetAddr();												//»ñÈ¡¹²ÏíÄÚ´æµØÖ·;
-	void* GetMappingData();											//»ñÈ¡ÄÚ´æÊı¾İ;
-	void  CloseMapping();											//¹Ø±Õ¹²ÏíÄÚ´æ;
+	void* GetAddr();												//è·å–å…±äº«å†…å­˜åœ°å€;
+	void* GetMappingData();											//è·å–å†…å­˜æ•°æ®;
+	void  CloseMapping();											//å…³é—­å…±äº«å†…å­˜;
 
 public:
 	bool Lock(bool bclose);
@@ -45,10 +45,10 @@ public:
 
 private:
 	int			m_iShareMemSize;
-	wstring		m_strShareMemName;
+    std::wstring m_strShareMemName;
 
 	HANDLE      m_hMutex;
 	HANDLE		m_hMapFile;
-	LPVOID		m_lpMapAddress;										//¹²ÏíÄÚ´æµØÖ·;
+	LPVOID		m_lpMapAddress;										//å…±äº«å†…å­˜åœ°å€;
 };
 

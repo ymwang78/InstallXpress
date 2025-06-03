@@ -1,10 +1,10 @@
-
+﻿
 #ifndef INIOPERATION__H__
 #define INIOPERATION__H__
 
 #include <atlbase.h>
 #include <string>
-using namespace std;
+
 
 class CIniReader
 {
@@ -14,8 +14,9 @@ public:
 	int ReadInteger(LPCTSTR szSection, LPCTSTR szKey, int iDefaultValue);
 	float ReadFloat(LPCTSTR szSection, LPCTSTR szKey, float fltDefaultValue);
 	bool ReadBoolean(LPCTSTR szSection, LPCTSTR szKey, bool bolDefaultValue);
-	wstring ReadString(LPCTSTR szSection, LPCTSTR szKey, LPCTSTR szDefaultValue);
-private:
+    std::wstring ReadString(LPCTSTR szSection, LPCTSTR szKey, LPCTSTR szDefaultValue);
+
+  private:
 	TCHAR m_szFileName[255];
 };
 

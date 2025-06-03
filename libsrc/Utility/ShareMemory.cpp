@@ -1,6 +1,7 @@
-#include "stdafx.h"
+ï»¿#include "stdafx.h"
 #include "ShareMemory.h"
 
+using namespace std;
 
 CShareMemory::CShareMemory(int iShareMemSize, wchar_t* pShareMemName)
 	: m_iShareMemSize(iShareMemSize)
@@ -17,7 +18,7 @@ CShareMemory::~CShareMemory()
 	CloseMapping();
 }
 
-//¹Ø±Õ¹²ÏíÄÚ´æ;
+//å…³é—­å…±äº«å†…å­˜;
 void CShareMemory::CloseMapping()
 {
 	if (m_lpMapAddress)
