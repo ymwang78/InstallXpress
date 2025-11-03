@@ -1,4 +1,4 @@
-local HRootKey = {
+﻿local HRootKey = {
     HKEY_CLASSES_ROOT = 0,
     HKEY_CURRENT_USER = 1,
     HKEY_LOCAL_MACHINE = 2,
@@ -37,7 +37,7 @@ local CSIDL_Enum = {
     CSIDL_PROGRAM_FILES             =38,
 };
 
-local _VERSION = "5.0.39.5"
+local _VERSION = "5.2.40.42"
 local _dirCompany = "C:\\TaijiControl"
 local _dirExeHomeDir = _dirCompany .. "\\TaiJiMPC5"
 local _dirExeFullPath = _dirCompany .. "\\TaiJiMPC5\\TaiJiMPC.exe"
@@ -181,17 +181,27 @@ end
 
 function KillProcesses()
 
-	installx.LogPrint("KillProcesses TaiJiMPC.exe ...")
-    installx.ProcessKill("TaiJiMPC.exe")
-
 	installx.LogPrint("KillProcesses TaiJiOPCSim.exe ...")
     installx.ProcessKill("TaiJiOPCSim.exe")
 
-	installx.LogPrint("Stop Service HostVM ...")
-    installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" --stop HostVM")
+	installx.LogPrint("KillProcesses TaiJiMPC.exe ...")
+    installx.ProcessKill("TaiJiMPC.exe")
+
+	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" --stop HostVM")
+	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostPy\\HostPy.exe\" --stop HostPy")
+	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" --uninstall HostVM")
+	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostPy\\HostPy.exe\" --uninstall HostPy")
+	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" service stop HostVM")
+	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostPy\\HostPy.exe\" service stop HostPy")
+	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" service remove HostVM")
+	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostPy\\HostPy.exe\" service remove HostPy")
 
 	installx.LogPrint("KillProcesses HostVM.exe ...")
     installx.ProcessKill("HostVM.exe")
+
+	installx.LogPrint("KillProcesses HostPy.exe ...")
+    installx.ProcessKill("HostPy.exe")
+
 end
 
 function StartSetup()
@@ -234,20 +244,22 @@ function PostSetup()
 	local percent = 95
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
 
-	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" --stop HostVM")
-	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" --uninstall HostVM")
-
     local opcEnum = installx.RegGetValue(HRootKey.HKEY_CLASSES_ROOT, "CLSID\\{13486D50-4821-11D2-A494-3CB306C10000}", "")
         or installx.RegGetValue(HRootKey.HKEY_CLASSES_ROOT, "WOW6432Node\\CLSID\\{13486D50-4821-11D2-A494-3CB306C10000}", "")
     if (opcEnum == nil or opcEnum == False) then
-        installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\opc\\GBDA_Install_Prereq_x86.msi\" /quiet")
     end
+
+    installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\opc\\GBDA_Install_Prereq_x86.msi\" /quiet")
+
+	local percent = 95
+	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
+
+    installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\opc\\GBDA_Install_Prereq_x64.msi\" /quiet")
 
 	local percent = 96
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
 
-    installx.ProcessExecute("msiexec /i \"" .. _dirCompany .. "\\Common\\opc\\GBDA_Install_Prereq_x86.msi\" /qn")
-    installx.ProcessExecute("\"" .. _dirCompany .. "\\TaiJiOPCSim\\bin\\TaiJiOPCSim.exe\" -RegServer")
+    installx.ProcessExecute("\"" .. _dirCompany .. "\\TaiJiOPCSim\\bin\\TaiJiOPCSim.exe\" -RegServer ")
 
 	installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{A48A6241-A024-4f99-B105-5DF8CCEA66BA}\\Implemented Categories", "", "")
 	installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{A48A6241-A024-4f99-B105-5DF8CCEA66BA}\\Implemented Categories\\{63D5F430-CFE4-11d1-B2C8-0060083BA1FB}", "", "")
@@ -264,6 +276,14 @@ function PostSetup()
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl", "InstallPath", _dirCompany)
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\TaiJiMPC5", "APPPath", _dirExeFullPath)
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\TaiJiMPC5", "Version", _VERSION)
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\PythonEnv", "InstallPath", _dirCompany .. "\\WinPy312\\python")
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\PythonEnv", "Version", "3.12")
+
+	installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl", "InstallPath", _dirCompany)
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\TaiJiMPC5", "APPPath", _dirExeFullPath)
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\TaiJiMPC5", "Version", _VERSION)
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\PythonEnv", "InstallPath", _dirCompany .. "\\WinPy312\\python")
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\PythonEnv", "Version", "3.12")
 
     local desktopDir = installx.FilePathGetSpecialLocation(CSIDL_Enum.CSIDL_COMMON_DESKTOPDIRECTORY)
     installx.FilePathCreateShortCut(desktopDir .. "\\TaiJiMPC5.lnk", _dirExeFullPath, _dirExeHomeDir, "TaiJiMPC5")
@@ -274,9 +294,13 @@ function PostSetup()
 
 	local percent = 98
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
-    installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" --uninstall HostVM")
-    installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" --install HostVM")
-    installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" --start HostVM")
+    installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" service install HostVM")
+    installx.ProcessExecute("\"" .. _dirCompany .. "\\HostPy\\HostPy.exe\" service install HostPy")
+    installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" service start HostVM")
+    installx.ProcessExecute("\"" .. _dirCompany .. "\\HostPy\\HostPy.exe\" service start HostPy")
+
+	install.FilePathDelete(_dirCompany .. "\\HostVM\\python3.dll")
+	install.FilePathDelete(_dirCompany .. "\\HostVM\\python312.dll")
 
 	local percent = 99
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
@@ -310,17 +334,17 @@ function _FinishInstall()
 
     local setPyEnv = installx.DuiOptionSelect("pyenvbtn")
     if (setPyEnv) then
-        local issucess, errdesc = installx.SysPathAdd(_dirCompany .. "\\Python312")
+        local issucess, errdesc = installx.SysPathAdd(_dirCompany .. "\\WinPy312\\python")
         if not issucess then
             installx.LogPrint(errdesc)
         end
 
-        issucess, errdesc = installx.SysPathAdd(_dirCompany .. "\\Python312\\Scripts")
+        issucess, errdesc = installx.SysPathAdd(_dirCompany .. "\\WinPy312\\python\\Scripts")
         if not issucess then
             installx.LogPrint(errdesc)
         end
 
-        issucess, errdesc = installx.SysEnvSet("PYTHONHOME", _dirCompany .. "\\Python312")
+        issucess, errdesc = installx.SysEnvSet("PYTHONHOME", _dirCompany .. "\\WinPy312\\python")
         if not issucess then
             installx.LogPrint(errdesc)
         end
