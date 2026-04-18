@@ -213,7 +213,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Install.lua" />
-    <None Include="res\Install.7z" />
   </ItemGroup>
   <ItemGroup>
     <Xml Include="res\InstallDialog.xml" />

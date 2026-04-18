@@ -78,7 +78,6 @@
     <None Include="Install.lua">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="res\Install.7z" />
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="res\Install.exe.manifest" />
