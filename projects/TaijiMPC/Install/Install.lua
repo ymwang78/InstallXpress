@@ -37,10 +37,12 @@ local CSIDL_Enum = {
     CSIDL_PROGRAM_FILES             =38,
 };
 
-local _VERSION = "5.2.40.42"
+local _VERSION = "5.2.41.1"
 local _dirCompany = "C:\\TaijiControl"
 local _dirExeHomeDir = _dirCompany .. "\\TaiJiMPC5"
 local _dirExeFullPath = _dirCompany .. "\\TaiJiMPC5\\TaiJiMPC.exe"
+local _dirExe6HomeDir = _dirCompany .. "\\TaiJiMPC6"
+local _dirExe6FullPath = _dirCompany .. "\\TaiJiMPC6\\TaiJiMPC.exe"
 
 local _bCustomPath = false
 
@@ -70,6 +72,8 @@ function ResetInstallPath(installPath)
     _dirCompany = installPath
     _dirExeHomeDir = _dirCompany .. "\\TaiJiMPC5"
     _dirExeFullPath = _dirCompany .. "\\TaiJiMPC5\\TaiJiMPC.exe"
+    _dirExe6HomeDir = _dirCompany .. "\\TaiJiMPC6"
+    _dirExe6FullPath = _dirCompany .. "\\TaiJiMPC6\\TaiJiMPC.exe"
 end
 
 function OnInitialize()
@@ -139,15 +143,23 @@ function OnSelChanged(btnName, isSelected)
 end
 
 local _image_index = 0
+-- Win32.7z (notifyID=134): 5%~60%; WinPy312.7z (notifyID=139): 60%~92%
 function OnUnzipProgress(nNotifyID, nTotalFileNum, nCurFileIndex, nTotalSize, nCurrentSize)
-	local percent = 5 + math.floor(90 * nCurFileIndex / nTotalFileNum)
-	if _image_index == 2 and  percent > 80 then
+	local percent
+	if nNotifyID == 134 then
+		percent = 5 + math.floor(55 * nCurFileIndex / nTotalFileNum)
+	elseif nNotifyID == 139 then
+		percent = 60 + math.floor(32 * nCurFileIndex / nTotalFileNum)
+	else
+		return
+	end
+	if _image_index < 3 and percent > 80 then
 		_image_index = 3
 		installx.DuiSetBkImage("mainlayout", "res='138' restype='png' source='0,666,600,886' corner='300,208,5,5'")
-	elseif _image_index == 1 and percent > 50 then
+	elseif _image_index < 2 and percent > 50 then
 		_image_index = 2
 		installx.DuiSetBkImage("mainlayout", "res='138' restype='png' source='0,444,600,664' corner='300,208,5,5'")
-	elseif _image_index == 0 and percent > 20 then
+	elseif _image_index < 1 and percent > 20 then
 		_image_index = 1
 		installx.DuiSetBkImage("mainlayout", "res='138' restype='png' source='0,222,600,442' corner='300,208,5,5'")
 	end
@@ -188,12 +200,12 @@ function KillProcesses()
     installx.ProcessKill("TaiJiMPC.exe")
 
 	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" --stop HostVM")
-	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostPy\\HostPy.exe\" --stop HostPy")
-	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" --uninstall HostVM")
-	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostPy\\HostPy.exe\" --uninstall HostPy")
 	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" service stop HostVM")
+	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostPy\\HostPy.exe\" --stop HostPy")
 	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostPy\\HostPy.exe\" service stop HostPy")
+	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" --uninstall HostVM")
 	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" service remove HostVM")
+	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostPy\\HostPy.exe\" --uninstall HostPy")
 	installx.ProcessExecute("\"" .. _dirCompany .. "\\HostPy\\HostPy.exe\" service remove HostPy")
 
 	installx.LogPrint("KillProcesses HostVM.exe ...")
@@ -234,9 +246,9 @@ function StartSetup()
     installx.DuiVisible("sureportlayout", false)
     installx.DuiVisible("installprogress", true)
 
-    -- 134: resource id of zip file
-	installx.LogPrint("Unzip Resource ID 134...")
-    installx.FilePathUnzip(134, _dirCompany, 134)
+    -- 134: Win32.7z, 139: WinPy312.7z
+	installx.LogPrint("Unzip Resource IDs 134, 139...")
+    installx.FilePathUnzip({134, 139}, _dirCompany)
 end
 
 function PostSetup()
@@ -269,6 +281,8 @@ function PostSetup()
         installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\hasp\\haspdinst.exe\" -install -nomsg")
     end
 
+	installx.ProcessExecute("\"%SystemRoot%\\System32\\cmd.exe\" /S /C \"" .. _dirCompany .. "\\HostPy\\install_python_env.bat\"", false, 10)
+
 	local percent = 97
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
 
@@ -286,10 +300,12 @@ function PostSetup()
 
     local desktopDir = installx.FilePathGetSpecialLocation(CSIDL_Enum.CSIDL_COMMON_DESKTOPDIRECTORY)
     installx.FilePathCreateShortCut(desktopDir .. "\\TaiJiMPC5.lnk", _dirExeFullPath, _dirExeHomeDir, "TaiJiMPC5")
+    installx.FilePathCreateShortCut(desktopDir .. "\\TaiJiMPC6.lnk", _dirExe6FullPath, _dirExe6HomeDir, "TaiJiMPC6")
 
     local startMenuDir = installx.FilePathGetSpecialLocation(CSIDL_Enum.CSIDL_COMMON_STARTMENU)
     installx.FilePathMkdir(startMenuDir .. "\\Programs\\TaijiControl")
     installx.FilePathCreateShortCut(startMenuDir .. "\\Programs\\TaijiControl\\TaiJiMPC5.lnk", _dirExeFullPath, _dirExeHomeDir, "TaiJiMPC5")
+    installx.FilePathCreateShortCut(startMenuDir .. "\\Programs\\TaijiControl\\TaiJiMPC6.lnk", _dirExe6FullPath, _dirExe6HomeDir, "TaiJiMPC6")
 
 	local percent = 98
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
@@ -298,9 +314,6 @@ function PostSetup()
     installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" service start HostVM")
     installx.ProcessExecute("\"" .. _dirCompany .. "\\HostPy\\HostPy.exe\" service start HostPy")
 
-	install.FilePathDelete(_dirCompany .. "\\HostVM\\python3.dll")
-	install.FilePathDelete(_dirCompany .. "\\HostVM\\python312.dll")
-
 	local percent = 99
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
 
@@ -308,9 +321,9 @@ function PostSetup()
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "TaiJiMPC5")
     UNINST_KEY = UNINST_KEY .. "\\TaiJiMPC5"
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayIcon", _dirExeFullPath)
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayName", "TaijiMPC5")
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayName", "Tai-Ji MPC5")
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayVersion", _VERSION)
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "Publisher", "TaijiSoft")
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "Publisher", "Tai-Ji Soft")
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "UninstallString", _dirCompany .. "\\TaiJiMPC5\\UnInstall.exe")
 
 	local percent = 100

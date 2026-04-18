@@ -254,13 +254,16 @@ void CMainFrame::_OnSelChanged(TNotifyUI &msg)
 
 struct InstallXpress_Unzip_Context_t
 {
+    std::vector<UINT> nResourceIDs;
 	int nResourceID;
     std::wstring strZipFile;
     std::wstring strUnzipDir;
     int nNotifyID;
 	HWND GetHWND() { return _sglMainFrame->GetHWND(); }
-	void InstallZip() { 
-        if (nResourceID)
+	void InstallZip() {
+        if (!nResourceIDs.empty())
+            _sglMainFrame->InstallZip(nResourceIDs, strUnzipDir);
+        else if (nResourceID)
             _sglMainFrame->InstallZip(nResourceID, strUnzipDir, nNotifyID);
         else {
             //@todo
@@ -304,6 +307,48 @@ int CMainFrame::UnzipFileAsync(const std::wstring& strZipFile, const std::wstrin
 
     m_hThread = (HANDLE)_beginthreadex(NULL, 0, &CMainFrame::InstallThread, ctx, 0, NULL);
 	return 0;
+}
+
+int CMainFrame::UnzipFileAsync(const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir)
+{
+    for (UINT id : resourceIDs) {
+        if (0 == FindResource(m_PaintManager.GetResourceDll(), MAKEINTRESOURCE(id), _T("INSTALLSOFT")))
+            return -1;
+    }
+    InstallXpress_Unzip_Context_t* ctx(new InstallXpress_Unzip_Context_t{});
+    ctx->nResourceIDs = resourceIDs;
+    ctx->strUnzipDir = strUnzipDir;
+    m_hThread = (HANDLE)_beginthreadex(NULL, 0, &CMainFrame::InstallThread, ctx, 0, NULL);
+    return 0;
+}
+
+void CMainFrame::InstallZip(const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir)
+{
+    m_pProgress->SetValue(0);
+    bool bInstallFinish = true;
+    for (UINT resourceID : resourceIDs) {
+        ResourceHandler* pInstallContent = LoadResourceFile(resourceID, _T("INSTALLSOFT"));
+        if (pInstallContent == NULL) {
+            bInstallFinish = false;
+            break;
+        }
+        CUnZip7z unzip7z;
+        int ret = unzip7z.unzip_7z_file(pInstallContent, strUnzipDir, this->GetHWND(), WM_INSTALLPROGRES_MSG, (int)resourceID);
+        if (ret != 0) {
+            APPLOG(Log::LOG_ERROR)("\n---Install: 解压失败 ret:%d---\n", ret);
+            bInstallFinish = false;
+            break;
+        }
+    }
+    if (bInstallFinish) {
+        int lastNotifyID = resourceIDs.empty() ? 0 : (int)resourceIDs.back();
+        ::PostMessage(this->GetHWND(), WM_INSTALLPROGRES_MSG, lastNotifyID, -1);
+    } else {
+        m_pProgress->SetText(_T("安装失败"));
+        if (m_pCloseBtn) m_pCloseBtn->SetEnabled(true);
+        return;
+    }
+    SetTimer(this->GetHWND(), WMPROGRESSFINISH_TIMER, PORGRESSHIDESEPLEN, 0);
 }
 
 void CMainFrame::InstallZip(UINT nResourceID, const std::wstring& strUnzipDir, int nNotifyID)

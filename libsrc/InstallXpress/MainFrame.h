@@ -34,7 +34,9 @@ public:
 	void InstallSetup();
 	int  UnzipFileAsync(unsigned resourceId, const std::wstring& strUnzipDir, int nNotifyID);
 	int  UnzipFileAsync(const std::wstring& strZipFile, const std::wstring& strUnzipDir, int nNotifyID);
+	int  UnzipFileAsync(const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir);
 	void InstallZip(UINT nResourceID, const std::wstring& strUnzipDir, int nNotifyID);
+	void InstallZip(const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir);
 	void SplitStringW(const WCHAR *pSrc, WCHAR chMark, std::vector<std::wstring> &vecStrings, BOOL bOnce);
 	
 public:

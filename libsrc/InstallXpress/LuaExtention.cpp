@@ -547,6 +547,23 @@ static int l_FilePathCreateShortCut(lua_State * L)
     return 1;
 }
 
+extern "C" static int l_FilePathCopy(lua_State* L) {
+    const char* srcPath = luaL_checkstring(L, 1);
+    const char* destPath = luaL_checkstring(L, 2);
+    BOOL overwrite = TRUE;
+    if (lua_isboolean(L, 3)) {
+        overwrite = lua_toboolean(L, 3) ? TRUE : FALSE;
+    }
+    APPLOG(LOG_TRACE)("%s: %s -> %s\n", "FilePathCopy", srcPath, destPath);
+    if (srcPath == nullptr || destPath == nullptr) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+    BOOL ret = CopyFile(Utf82Unicode(srcPath).c_str(), Utf82Unicode(destPath).c_str(), overwrite);
+    lua_pushboolean(L, ret);
+    return 1;
+}
+
 extern "C"
 static int l_FilePathDelete(lua_State * L)
 {
@@ -645,7 +662,25 @@ extern "C"
 static int l_FilePathUnzipAsync(lua_State * L)
 {
     //FilePathUnzip(zipFile, destDir, NotifyID)
-    if (lua_isinteger(L, 1)) {
+    //FilePathUnzip({resID1, resID2, ...}, destDir)
+    if (lua_istable(L, 1)) {
+        const char* destDir = luaL_checkstring(L, 2);
+        if (destDir == nullptr) {
+            lua_pushboolean(L, false);
+            return 1;
+        }
+        std::vector<UINT> resourceIDs;
+        lua_pushnil(L);
+        while (lua_next(L, 1) != 0) {
+            if (lua_isinteger(L, -1))
+                resourceIDs.push_back((UINT)lua_tointeger(L, -1));
+            lua_pop(L, 1);
+        }
+        int ret = CMainFrame::GetInstance()->UnzipFileAsync(resourceIDs, Utf82Unicode(destDir));
+        lua_pushboolean(L, ret >= 0);
+        return 1;
+    }
+    else if (lua_isinteger(L, 1)) {
         unsigned resourceId = (unsigned) lua_tointeger(L, 1);
 		const char* destDir = luaL_checkstring(L, 2);
 		int notifyID = 0;
@@ -1077,6 +1112,7 @@ static const luaL_Reg reglib[] = {
 
     {"FilePathChoose", l_FilePathChoose},
     {"FilePathCreateShortCut", l_FilePathCreateShortCut},
+    {"FilePathCopy", l_FilePathCopy},
     {"FilePathDelete", l_FilePathDelete},
     {"FilePathExists", l_FilePathExists},
     {"FilePathGetSpecialLocation", l_FilePathGetSpecialLocation},
