@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Window size="600,380" mininfo="600,380" maxinfo="600,380" caption="0,0,0,380" roundcorner="6,6,6,6" showshadow="true" shadowsize="3" shadowpositon="1,1" shadowcolor="#00666666">
+<Font name="微软雅黑" size="12" default="true"/>
+<Font name="微软雅黑" size="14"/>
+<Font name="微软雅黑" size="22"/>
+<Font name="微软雅黑" size="40" bold="true"/>
+<Font name="微软雅黑" size="16"/>
+	<VerticalLayout bkimage="res='131' restype='png' source='0,0,600,220' corner='300,208,300,5'">
+		<HorizontalLayout height="40" inset="10,8,10,0">
+			<Label name="piupiulogo" bkimage="res='130' restype='png'" width="24" height="20"/>
+			<Label name="titletext" text="卸载程序" textcolor="#FFFFFFFF" font="1" height="20" textpadding="10,0,0,0"/>
+			<Button name="closebtn" width="22" height="22" normalimage="res='131' restype='png' source='600,18,622,40'" hotimage="res='131' restype='png' source='622,18,644,40'" pushedimage="res='131' restype='png' source='644,18,666,40'"/>
+		</HorizontalLayout>
+		<VerticalLayout name="initlayout">
+			<VerticalLayout height="150" inset="0,40,0,0">
+				<Label name="sitenamelabel" height="60" font="3" align="center" textcolor="#FFFF4B4B"/>
+				<Label name="piupiulog" bkimage="file='installlog.png'" visible="false" width="142" height="60" float="true" pos="230,57,0,0"/>
+			</VerticalLayout>
+			<VerticalLayout>
+				<Button name="staruninstallbtn" width="200" height="50" normalimage="res='131' restype='png' source='0,320,200,370' corner='5,5,5,5'" hotimage="res='131' restype='png' source='200,320,400,370' corner='5,5,5,5'" pushedimage="res='131' restype='png' source='400,320,600,370' corner='5,5,5,5'" disabledimage="res='131' restype='png' source='600,320,800,370' corner='5,5,5,5'" float="true" pos="200,60,0,0"/>				
+				<Progress name="uninstallprogress" width="200" height="50" text="正在载入" align="center" textpadding="0,10,0,0" font="2" textcolor="#FFFFFFFF" float="true" pos="200,60,0,0" bkimage="res='131' restype='png' source='100,370,200,420' corner='25,25,25,25'" foreimage="res='131' restype='png' source='0,370,100,420' corner='25,25,25,25'" visible="false"/>
+				<Button name="uninstallfinishbtn" width="200" height="50" normalimage="res='131' restype='png' source='200,370,400,420' corner='5,5,5,5'" hotimage="res='131' restype='png' source='400,370,600,420' corner='5,5,5,5'" pushedimage="res='131' restype='png' source='600,370,800,420' corner='5,5,5,5'" float="true" pos="200,60,0,0" visible="false"/>
+			</VerticalLayout>				
+		</VerticalLayout>		
+	</VerticalLayout>
+</Window>

@@ -55,7 +55,7 @@ IDB_LOGO_PNG            PNG                     "res\\loginlogo.png"
 // REGCONTENT
 //
 
-IDR_REGCONTENT1         REGCONTENT              "res\\许可协议.txt"
+IDR_REGCONTENT1         REGCONTENT              "res\\License.txt"
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -89,13 +89,13 @@ BEGIN
         BLOCK "080404b0"
         BEGIN
             VALUE "CompanyName", "Tai-Ji Control"
-            VALUE "FileDescription", "Tai-Ji MPC安装程序"
-            VALUE "FileVersion", "5.2.41.1"
+            VALUE "FileDescription", "Tai-Ji MPC"
+            VALUE "FileVersion", "5.2.41.3"
             VALUE "InternalName", "Install.exe"
             VALUE "LegalCopyright", "Copyright (C) 2026"
             VALUE "OriginalFilename", "Install.exe"
             VALUE "ProductName", "Tai-Ji MPC"
-            VALUE "ProductVersion", "5.2.41.1"
+            VALUE "ProductVersion", "5.2.41.3"
         END
     END
     BLOCK "VarFileInfo"
@@ -156,6 +156,7 @@ IDI_INSTALL             ICON                    "Install.ico"
 
 IDR_INSTALLSOFT1        INSTALLSOFT             "res\\Win32.7z"
 IDR_INSTALLSOFT2        INSTALLSOFT             "res\\WinPy312.7z"
+IDR_INSTALLSOFT3        INSTALLSOFT             "res\\TaiJiDataSvc.7z"
 
 /////////////////////////////////////////////////////////////////////////////
 //

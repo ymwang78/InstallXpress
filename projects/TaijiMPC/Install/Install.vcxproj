@@ -184,7 +184,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <Text Include="res\UserLicense.txt" />
-    <Text Include="res\许可协议.txt" />
+    <Text Include="res\License.txt" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Install.h" />
