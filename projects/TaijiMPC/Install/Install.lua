@@ -1,4 +1,4 @@
-﻿local HRootKey = {
+local HRootKey = {
     HKEY_CLASSES_ROOT = 0,
     HKEY_CURRENT_USER = 1,
     HKEY_LOCAL_MACHINE = 2,
@@ -45,6 +45,7 @@ local _dirExe6HomeDir = _dirCompany .. "\\TaiJiMPC6"
 local _dirExe6FullPath = _dirCompany .. "\\TaiJiMPC6\\TaiJiMPC.exe"
 
 local _bCustomPath = false
+local _installTaiJiDataSvc = false
 
 local _strResourceCN = {
 	SETUP = "泰极MPC安装程序",
@@ -211,6 +212,17 @@ function KillProcesses()
 
 end
 
+function RunBatchFile(batchPath, waitSeconds)
+    if not installx.FilePathExists(batchPath) then
+        installx.LogPrint("Skip missing batch file: " .. batchPath)
+        return false
+    end
+
+    local command = "cmd.exe /S /C call \"" .. batchPath .. "\""
+    installx.LogPrint("Run batch file: " .. command)
+    return installx.ProcessExecute(command, false, waitSeconds or 30)
+end
+
 function StartSetup()
 
 	installx.LogPrint("Require Admin Promote ...")
@@ -241,18 +253,19 @@ function StartSetup()
     installx.DuiVisible("sureportlayout", false)
     installx.DuiVisible("installprogress", true)
 
-	-- 134: Win32.7z, 139: WinPy312.7z
-	installx.LogPrint("Unzip Resource IDs 134, 139...")
-	installx.FilePathUnzip({134, 139}, _dirCompany)
-
-	-- 140: TaiJiDataSvc.7z (skip if TaiJiDataSvc already exists)
 	local _dirTaiJiDataSvc = _dirCompany .. "\\TaiJiDataSvc"
-	if not installx.FilePathExists(_dirTaiJiDataSvc) then
-		installx.LogPrint("Unzip Resource ID 140 (TaiJiDataSvc.7z)...")
-		installx.FilePathUnzip({140}, _dirCompany)
+	_installTaiJiDataSvc = not installx.FilePathExists(_dirTaiJiDataSvc)
+
+	local resourceIDs = {134, 139}
+	if _installTaiJiDataSvc then
+		installx.LogPrint("Include Resource ID 140 (TaiJiDataSvc.7z)...")
+		table.insert(resourceIDs, 140)
 	else
 		installx.LogPrint("Skip TaiJiDataSvc.7z, directory already exists: " .. _dirTaiJiDataSvc)
 	end
+
+	installx.LogPrint("Unzip selected resources in one pass...")
+	installx.FilePathUnzip(resourceIDs, _dirCompany)
 end
 
 function PostSetup()
@@ -287,10 +300,14 @@ function PostSetup()
         installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\hasp\\haspdinst.exe\" -install -nomsg")
     end
 
-	installx.ProcessExecute("\"%SystemRoot%\\System32\\cmd.exe\" /S /C \"" .. _dirCompany .. "\\HostVM\\install_python_env.bat\"", false, 10)
-	installx.ProcessExecute("\"%SystemRoot%\\System32\\cmd.exe\" /S /C \"" .. _dirCompany .. "\\TaiJiDataSvc\\install_TaiJiDataSvc.bat\"", false, 30)
-	installx.ProcessExecute("\"%SystemRoot%\\System32\\cmd.exe\" /S /C \"" .. _dirCompany .. "\\TaiJiDataClient\\install_TaiJiDataClient.bat\"", false, 30)
-	installx.ProcessExecute("\"%SystemRoot%\\System32\\cmd.exe\" /S /C \"" .. _dirCompany .. "\\TaijiPYSim\\install_taijiopcsim.bat\"", false, 30)
+	RunBatchFile(_dirCompany .. "\\HostVM\\install_python_env.bat", 10)
+	if _installTaiJiDataSvc then
+		RunBatchFile(_dirCompany .. "\\TaiJiDataSvc\\install_TaiJiDataSvc.bat", 30)
+	else
+		installx.LogPrint("Skip install_TaiJiDataSvc.bat, TaiJiDataSvc already exists")
+	end
+	RunBatchFile(_dirCompany .. "\\TaiJiDataClient\\install_TaiJiDataClient.bat", 30)
+	RunBatchFile(_dirCompany .. "\\TaijiPYSim\\install_taijiopcsim.bat", 30)
 
 	local percent = 97
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )

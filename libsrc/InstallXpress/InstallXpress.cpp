@@ -5,6 +5,7 @@
 #include <process.h>
 #include <shellapi.h>
 #include <TlHelp32.h>
+#include <vector>
 #include "MainFrame.h"
 #include "Utility/log.h"
 #include "InstallXpress.h"
@@ -78,7 +79,7 @@ BOOL KillProcess(const wchar_t* szProcessName)
         if (_tcsicmp(pe32.szExeFile, szProcessName) == 0) {
             HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
             if (hProcess) {
-                TerminateProcess(hProcess, 0);//¹Ø±Õ½ø³Ì;
+                TerminateProcess(hProcess, 0);//å…³é—­è¿›ç¨‹;
                 CloseHandle(hProcess);
             }
         }
@@ -115,6 +116,80 @@ BOOL FindProcess(const wchar_t* szProcessName)
 extern "C"
 DWORD ExecuteProcess(const wchar_t* cmd, bool hidden, int wait_second)
 {
+    if (cmd == NULL || cmd[0] == L'\0') {
+        return S_FALSE;
+    }
+
+    auto Trim = [](const std::wstring& text) -> std::wstring {
+        const size_t begin = text.find_first_not_of(L" \t\r\n");
+        if (begin == std::wstring::npos) {
+            return L"";
+        }
+
+        const size_t end = text.find_last_not_of(L" \t\r\n");
+        return text.substr(begin, end - begin + 1);
+        };
+
+    auto ExpandCommand = [](const std::wstring& rawCommand) -> std::wstring {
+        DWORD required = ExpandEnvironmentStringsW(rawCommand.c_str(), NULL, 0);
+        if (required == 0) {
+            return rawCommand;
+        }
+
+        std::vector<wchar_t> buffer(required, L'\0');
+        DWORD written = ExpandEnvironmentStringsW(rawCommand.c_str(), buffer.data(), required);
+        if (written == 0 || written > required) {
+            return rawCommand;
+        }
+
+        return std::wstring(buffer.data());
+        };
+
+    auto ExtractFirstToken = [&](const std::wstring& text) -> std::wstring {
+        std::wstring trimmed = Trim(text);
+        if (trimmed.empty()) {
+            return L"";
+        }
+
+        if (trimmed[0] == L'"') {
+            const size_t closingQuote = trimmed.find(L'"', 1);
+            if (closingQuote != std::wstring::npos) {
+                return trimmed.substr(1, closingQuote - 1);
+            }
+        }
+
+        const size_t separator = trimmed.find_first_of(L" \t");
+        if (separator == std::wstring::npos) {
+            return trimmed;
+        }
+
+        return trimmed.substr(0, separator);
+        };
+
+    auto EndsWithNoCase = [](const std::wstring& text, const wchar_t* suffix) -> bool {
+        const size_t suffixLen = wcslen(suffix);
+        if (text.length() < suffixLen) {
+            return false;
+        }
+
+        return _wcsicmp(text.c_str() + text.length() - suffixLen, suffix) == 0;
+        };
+
+    std::wstring expandedCommand = ExpandCommand(cmd);
+    std::wstring executable = ExtractFirstToken(expandedCommand);
+    if (executable.empty()) {
+        return S_FALSE;
+    }
+
+    // MSI packages need to be dispatched via msiexec, while batch files
+    // work once the %SystemRoot% / %ComSpec% variables are expanded above.
+    if (EndsWithNoCase(executable, L".msi")) {
+        expandedCommand = L"msiexec.exe /i " + expandedCommand;
+    }
+
+    std::vector<wchar_t> commandLine(expandedCommand.begin(), expandedCommand.end());
+    commandLine.push_back(L'\0');
+
     DWORD ret = S_OK;
     STARTUPINFO si{ sizeof(si) };
     PROCESS_INFORMATION pi{};
@@ -124,7 +199,7 @@ DWORD ExecuteProcess(const wchar_t* cmd, bool hidden, int wait_second)
         si.wShowWindow = SW_HIDE;
     }
     if (CreateProcess(NULL,
-        (LPTSTR)cmd,
+        commandLine.data(),
         NULL,
         NULL,
         FALSE,
@@ -140,6 +215,7 @@ DWORD ExecuteProcess(const wchar_t* cmd, bool hidden, int wait_second)
         return ret;
     }
     else {
+        APPLOG(Log::LOG_ERROR)("\n---ExecuteProcess failed, last error:%lu---\n", GetLastError());
         return S_FALSE;
     }
 }

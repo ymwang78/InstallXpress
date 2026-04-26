@@ -1,4 +1,4 @@
-﻿#include "stdafx.h"
+#include "stdafx.h"
 #include "UnZip7z.h"
 #include <Shlwapi.h>
 #include "Utility/TypeConvertUtil.h"
@@ -18,6 +18,128 @@ extern "C"
 }
 
 extern "C" void ExecuteProcess(const wchar_t* cmd, bool hidden, int wait_second);
+
+namespace {
+
+std::wstring NormalizeSeparators(std::wstring path)
+{
+    for (wchar_t& ch : path) {
+        if (ch == L'/') {
+            ch = L'\\';
+        }
+    }
+    return path;
+}
+
+bool IsExtendedLengthPath(const std::wstring& path)
+{
+    return path.rfind(L"\\\\?\\", 0) == 0;
+}
+
+std::wstring ToExtendedLengthPath(const std::wstring& path)
+{
+    if (path.empty() || IsExtendedLengthPath(path)) {
+        return path;
+    }
+
+    if (path.rfind(L"\\\\", 0) == 0) {
+        return L"\\\\?\\UNC\\" + path.substr(2);
+    }
+
+    if (path.length() > 2 && path[1] == L':') {
+        return L"\\\\?\\" + path;
+    }
+
+    return path;
+}
+
+size_t GetRootLength(const std::wstring& path)
+{
+    if (path.rfind(L"\\\\?\\UNC\\", 0) == 0) {
+        size_t serverEnd = path.find(L'\\', 8);
+        if (serverEnd == std::wstring::npos) {
+            return path.length();
+        }
+        size_t shareEnd = path.find(L'\\', serverEnd + 1);
+        return shareEnd == std::wstring::npos ? path.length() : shareEnd + 1;
+    }
+
+    if (path.rfind(L"\\\\?\\", 0) == 0 && path.length() > 6 && path[5] == L':' && path[6] == L'\\') {
+        return 7;
+    }
+
+    if (path.rfind(L"\\\\", 0) == 0) {
+        size_t serverEnd = path.find(L'\\', 2);
+        if (serverEnd == std::wstring::npos) {
+            return path.length();
+        }
+        size_t shareEnd = path.find(L'\\', serverEnd + 1);
+        return shareEnd == std::wstring::npos ? path.length() : shareEnd + 1;
+    }
+
+    if (path.length() > 2 && path[1] == L':' && path[2] == L'\\') {
+        return 3;
+    }
+
+    return 0;
+}
+
+bool EnsureDirectoryTree(const std::wstring& rawPath)
+{
+    std::wstring normalizedPath = NormalizeSeparators(rawPath);
+    if (normalizedPath.empty()) {
+        return false;
+    }
+
+    if (normalizedPath.back() == L'\\') {
+        normalizedPath.pop_back();
+    }
+    if (normalizedPath.empty()) {
+        return false;
+    }
+
+    std::wstring longPath = ToExtendedLengthPath(normalizedPath);
+    const size_t rootLength = GetRootLength(longPath);
+
+    for (size_t i = rootLength; i < longPath.length(); ++i) {
+        if (longPath[i] != L'\\') {
+            continue;
+        }
+
+        std::wstring currentPath = longPath.substr(0, i);
+        if (currentPath.empty()) {
+            continue;
+        }
+
+        if (!CreateDirectoryW(currentPath.c_str(), NULL)) {
+            DWORD lastError = GetLastError();
+            if (lastError != ERROR_ALREADY_EXISTS) {
+                return false;
+            }
+        }
+    }
+
+    if (!CreateDirectoryW(longPath.c_str(), NULL)) {
+        DWORD lastError = GetLastError();
+        if (lastError != ERROR_ALREADY_EXISTS) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+std::wstring GetParentDirectory(const std::wstring& rawPath)
+{
+    std::wstring normalizedPath = NormalizeSeparators(rawPath);
+    const size_t separator = normalizedPath.find_last_of(L'\\');
+    if (separator == std::wstring::npos) {
+        return L"";
+    }
+    return normalizedPath.substr(0, separator);
+}
+
+}
 
 CUnZip7z::CUnZip7z()
 {
@@ -167,9 +289,12 @@ int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, const std::wstring &mUn
 
 		size_t offset = 0;
 		size_t outSizeProcessed = 0;
-		size_t len;
 		pNotifyMsg->isDir = SzArEx_IsDir(&db, i);
-		len = SzArEx_GetFileNameUtf16(&db, i, (UInt16*)pNotifyMsg->szFileName);
+        size_t fileNameLen = SzArEx_GetFileNameUtf16(&db, i, NULL);
+        std::vector<UInt16> fileNameBuffer(fileNameLen == 0 ? 1 : fileNameLen, 0);
+        SzArEx_GetFileNameUtf16(&db, i, fileNameBuffer.data());
+        std::wstring archivePath(reinterpret_cast<wchar_t*>(fileNameBuffer.data()));
+        wcsncpy_s(pNotifyMsg->szFileName, _countof(pNotifyMsg->szFileName), archivePath.c_str(), _TRUNCATE);
 
 		if (!pNotifyMsg->isDir) {
 			res = SzArEx_Extract(&db, &lookIn.vtbl, i, &blockIndex, &outBuffer, &outBufferSize,
@@ -183,42 +308,48 @@ int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, const std::wstring &mUn
 			pNotifyMsg->currentSize += outSizeProcessed;
 		}
 
-		TCHAR szFile[MAX_PATH] = { 0 };
-		_tcscpy_s(szFile, lpszOutputPath);
+        std::wstring outputPath = NormalizeSeparators(lpszOutputPath);
+        if (!outputPath.empty() && outputPath.back() != L'\\') {
+            outputPath.push_back(L'\\');
+        }
+        std::wstring fullPath = outputPath + NormalizeSeparators(archivePath);
+        std::wstring longFullPath = ToExtendedLengthPath(fullPath);
 
 		CSzFile outFile;
 		size_t processedSize;
-		PathAppend(szFile, (LPCWSTR)pNotifyMsg->szFileName);
-
-		for (size_t j = 0; szFile[j] != 0; j++) {
-			if ((szFile[j] == '/') || (szFile[j] == '\\')) {
-				szFile[j] = 0;
-				CreateDirectory(szFile, 0);
-				szFile[j] = CHAR_PATH_SEPARATOR;
-			}
-		}
 		if (pNotifyMsg->isDir) {
-			CreateDirectory(szFile, 0);
+            if (!EnsureDirectoryTree(fullPath)) {
+                res = SZ_ERROR_FAIL;
+                APPLOG(Log::LOG_ERROR)("\n---unzip_7z_file: CreateDirectory error, dirname : %s ,last error:%lu---\n", WtoS(fullPath).c_str(), GetLastError());
+                delete pNotifyMsg;
+                break;
+            }
 			PostMessage(callback, Msg, nNotifyID, (LPARAM)pNotifyMsg);
 			continue;
 		}
 		else {
+            std::wstring parentDirectory = GetParentDirectory(fullPath);
+            if (!parentDirectory.empty() && !EnsureDirectoryTree(parentDirectory)) {
+                res = SZ_ERROR_FAIL;
+                APPLOG(Log::LOG_ERROR)("\n---unzip_7z_file: CreateDirectory error, dirname : %s ,last error:%lu---\n", WtoS(parentDirectory).c_str(), GetLastError());
+                delete pNotifyMsg;
+                break;
+            }
 			do {
 				res = 0;
-                DWORD dLastError = OutFile_OpenW(&outFile, szFile);
+                DWORD dLastError = OutFile_OpenW(&outFile, longFullPath.c_str());
                 if (dLastError) {
 					if (dLastError == 5) {
-						//有的程序例如HASP会拒绝其他进程访问，先用SHELL去删除
-                        CDuiString delCommand;
-						delCommand.Format(L"cmd /c del /F /Q %s", szFile);
-                        ExecuteProcess(delCommand, true, -1);
-						dLastError = OutFile_OpenW(&outFile, szFile);
+						// Some tools keep files locked; try a shell delete before retrying.
+                        std::wstring delCommand = L"cmd /c del /F /Q \"" + fullPath + L"\"";
+                        ExecuteProcess(delCommand.c_str(), true, -1);
+						dLastError = OutFile_OpenW(&outFile, longFullPath.c_str());
 					}
 					if (dLastError) {
                         res = SZ_ERROR_FAIL;
-                        APPLOG(Log::LOG_ERROR)("\n---unzip_7z_file: OutFile_OpenW error, filename : %s ,last error:%lu---\n", WtoS(szFile).c_str(), dLastError);
+                        APPLOG(Log::LOG_ERROR)("\n---unzip_7z_file: OutFile_OpenW error, filename : %s ,last error:%lu---\n", WtoS(fullPath).c_str(), dLastError);
                         CDuiString msg;
-                        msg.Format(_T("写入文件:<%s>失败"), szFile);
+                        msg.Format(_T("写入文件:<%s>失败"), fullPath.c_str());
                         int ret = MessageBox(NULL, msg, _T("错误提示"), MB_ABORTRETRYIGNORE);
                         if (ret == IDRETRY) {
                             continue;
@@ -253,7 +384,7 @@ int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, const std::wstring &mUn
 
 #ifdef USE_WINDOWS_FILE
 		if (SzBitWithVals_Check(&db.Attribs, i))
-			SetFileAttributesW(szFile, db.Attribs.Vals[i]);
+			SetFileAttributesW(longFullPath.c_str(), db.Attribs.Vals[i]);
 #endif
 		PostMessage(callback, Msg, nNotifyID, (LPARAM)pNotifyMsg);
 	}
@@ -301,30 +432,5 @@ BOOL CUnZip7z::FolderExist(const std::wstring& strPath)
 // 返回值: BOOL 成功True 失败False ;///////////////////////////////////////////////////////////////////////////// 
 BOOL CUnZip7z::CreatedMultipleDirectory(std::wstring Directoryname)
 {
-	if (Directoryname[Directoryname.length() - 1] != '\\')
-	{
-		Directoryname.append(1, '\\');
-	}
-	std::vector< std::wstring> vpath;
-	std::wstring strtemp;
-	BOOL  bSuccess = FALSE;
-	for (size_t i = 0; i < Directoryname.length(); i++)
-	{
-		if (Directoryname[i] != '\\')
-		{
-			strtemp.append(1, Directoryname[i]);
-		}
-		else
-		{
-			vpath.push_back(strtemp);
-			strtemp.append(1, '\\');
-		}
-	}
-	std::vector<std::wstring>::const_iterator vIter;
-	for (vIter = vpath.begin();vIter != vpath.end(); vIter++)
-	{
-		bSuccess = CreateDirectory(vIter->c_str(), NULL) ? TRUE : FALSE;
-	}
-
-	return bSuccess;
+    return EnsureDirectoryTree(Directoryname) ? TRUE : FALSE;
 }

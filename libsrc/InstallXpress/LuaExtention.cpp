@@ -756,8 +756,8 @@ static int l_ProcessExecute(lua_State * L)
         return 1;
     }
 
-    ExecuteProcess(strCommand.c_str(), hidden, wait_sec);
-    lua_pushboolean(L, true);
+    DWORD ret = ExecuteProcess(strCommand.c_str(), hidden, wait_sec);
+    lua_pushboolean(L, ret != S_FALSE);
     return 1;
 }
 
