@@ -662,7 +662,7 @@ extern "C"
 static int l_FilePathUnzipAsync(lua_State * L)
 {
     //FilePathUnzip(zipFile, destDir, NotifyID)
-    //FilePathUnzip({resID1, resID2, ...}, destDir)
+    //FilePathUnzip({resID1, resID2, ...}, destDir, {"skip\\prefix"})
     if (lua_istable(L, 1)) {
         const char* destDir = luaL_checkstring(L, 2);
         if (destDir == nullptr) {
@@ -670,13 +670,22 @@ static int l_FilePathUnzipAsync(lua_State * L)
             return 1;
         }
         std::vector<UINT> resourceIDs;
+        std::vector<std::wstring> skipPrefixes;
         lua_pushnil(L);
         while (lua_next(L, 1) != 0) {
             if (lua_isinteger(L, -1))
                 resourceIDs.push_back((UINT)lua_tointeger(L, -1));
             lua_pop(L, 1);
         }
-        int ret = CMainFrame::GetInstance()->UnzipFileAsync(resourceIDs, Utf82Unicode(destDir));
+        if (lua_istable(L, 3)) {
+            lua_pushnil(L);
+            while (lua_next(L, 3) != 0) {
+                if (lua_isstring(L, -1))
+                    skipPrefixes.push_back(Utf82Unicode(lua_tostring(L, -1)));
+                lua_pop(L, 1);
+            }
+        }
+        int ret = CMainFrame::GetInstance()->UnzipFileAsync(resourceIDs, Utf82Unicode(destDir), skipPrefixes);
         lua_pushboolean(L, ret >= 0);
         return 1;
     }

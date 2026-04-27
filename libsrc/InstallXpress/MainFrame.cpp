@@ -255,6 +255,7 @@ void CMainFrame::_OnSelChanged(TNotifyUI &msg)
 struct InstallXpress_Unzip_Context_t
 {
     std::vector<UINT> nResourceIDs;
+    std::vector<std::wstring> skipPrefixes;
 	int nResourceID;
     std::wstring strZipFile;
     std::wstring strUnzipDir;
@@ -262,7 +263,7 @@ struct InstallXpress_Unzip_Context_t
 	HWND GetHWND() { return _sglMainFrame->GetHWND(); }
 	void InstallZip() {
         if (!nResourceIDs.empty())
-            _sglMainFrame->InstallZip(nResourceIDs, strUnzipDir);
+            _sglMainFrame->InstallZip(nResourceIDs, strUnzipDir, skipPrefixes);
         else if (nResourceID)
             _sglMainFrame->InstallZip(nResourceID, strUnzipDir, nNotifyID);
         else {
@@ -309,7 +310,7 @@ int CMainFrame::UnzipFileAsync(const std::wstring& strZipFile, const std::wstrin
 	return 0;
 }
 
-int CMainFrame::UnzipFileAsync(const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir)
+int CMainFrame::UnzipFileAsync(const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir, const std::vector<std::wstring>& skipPrefixes)
 {
     for (UINT id : resourceIDs) {
         if (0 == FindResource(m_PaintManager.GetResourceDll(), MAKEINTRESOURCE(id), _T("INSTALLSOFT")))
@@ -317,12 +318,13 @@ int CMainFrame::UnzipFileAsync(const std::vector<UINT>& resourceIDs, const std::
     }
     InstallXpress_Unzip_Context_t* ctx(new InstallXpress_Unzip_Context_t{});
     ctx->nResourceIDs = resourceIDs;
+    ctx->skipPrefixes = skipPrefixes;
     ctx->strUnzipDir = strUnzipDir;
     m_hThread = (HANDLE)_beginthreadex(NULL, 0, &CMainFrame::InstallThread, ctx, 0, NULL);
     return 0;
 }
 
-void CMainFrame::InstallZip(const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir)
+void CMainFrame::InstallZip(const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir, const std::vector<std::wstring>& skipPrefixes)
 {
     m_pProgress->SetValue(0);
     bool bInstallFinish = true;
@@ -333,7 +335,7 @@ void CMainFrame::InstallZip(const std::vector<UINT>& resourceIDs, const std::wst
             break;
         }
         CUnZip7z unzip7z;
-        int ret = unzip7z.unzip_7z_file(pInstallContent, strUnzipDir, this->GetHWND(), WM_INSTALLPROGRES_MSG, (int)resourceID);
+        int ret = unzip7z.unzip_7z_file(pInstallContent, strUnzipDir, this->GetHWND(), WM_INSTALLPROGRES_MSG, (int)resourceID, skipPrefixes);
         if (ret != 0) {
             APPLOG(Log::LOG_ERROR)("\n---Install: 解压失败 ret:%d---\n", ret);
             bInstallFinish = false;

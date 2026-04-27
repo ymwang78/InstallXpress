@@ -257,15 +257,18 @@ function StartSetup()
 	_installTaiJiDataSvc = not installx.FilePathExists(_dirTaiJiDataSvc)
 
 	local resourceIDs = {134, 139}
+	local skipPrefixes = nil
 	if _installTaiJiDataSvc then
 		installx.LogPrint("Include Resource ID 140 (TaiJiDataSvc.7z)...")
 		table.insert(resourceIDs, 140)
 	else
+		skipPrefixes = {"TaiJiDataSvc"}
 		installx.LogPrint("Skip TaiJiDataSvc.7z, directory already exists: " .. _dirTaiJiDataSvc)
+		installx.LogPrint("Skip TaiJiDataSvc entries from bundled archives as well")
 	end
 
 	installx.LogPrint("Unzip selected resources in one pass...")
-	installx.FilePathUnzip(resourceIDs, _dirCompany)
+	installx.FilePathUnzip(resourceIDs, _dirCompany, skipPrefixes)
 end
 
 function PostSetup()

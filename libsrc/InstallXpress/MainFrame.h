@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #include <Utility/DirUtility.h>
 #include <Utility/ResourceHandler.h>
 class InstallLua;
@@ -34,9 +35,9 @@ public:
 	void InstallSetup();
 	int  UnzipFileAsync(unsigned resourceId, const std::wstring& strUnzipDir, int nNotifyID);
 	int  UnzipFileAsync(const std::wstring& strZipFile, const std::wstring& strUnzipDir, int nNotifyID);
-	int  UnzipFileAsync(const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir);
+	int  UnzipFileAsync(const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir, const std::vector<std::wstring>& skipPrefixes = {});
 	void InstallZip(UINT nResourceID, const std::wstring& strUnzipDir, int nNotifyID);
-	void InstallZip(const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir);
+	void InstallZip(const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir, const std::vector<std::wstring>& skipPrefixes = {});
 	void SplitStringW(const WCHAR *pSrc, WCHAR chMark, std::vector<std::wstring> &vecStrings, BOOL bOnce);
 	
 public:

@@ -139,6 +139,52 @@ std::wstring GetParentDirectory(const std::wstring& rawPath)
     return normalizedPath.substr(0, separator);
 }
 
+bool StartsWithNoCase(const std::wstring& text, const std::wstring& prefix)
+{
+    if (text.length() < prefix.length()) {
+        return false;
+    }
+
+    return _wcsnicmp(text.c_str(), prefix.c_str(), prefix.length()) == 0;
+}
+
+bool ShouldSkipArchivePath(const std::wstring& archivePath, const std::vector<std::wstring>& skipPrefixes)
+{
+    if (skipPrefixes.empty()) {
+        return false;
+    }
+
+    std::wstring normalizedArchivePath = NormalizeSeparators(archivePath);
+    while (!normalizedArchivePath.empty() && normalizedArchivePath.front() == L'\\') {
+        normalizedArchivePath.erase(normalizedArchivePath.begin());
+    }
+
+    for (std::wstring prefix : skipPrefixes) {
+        prefix = NormalizeSeparators(prefix);
+        while (!prefix.empty() && prefix.front() == L'\\') {
+            prefix.erase(prefix.begin());
+        }
+        while (!prefix.empty() && prefix.back() == L'\\') {
+            prefix.pop_back();
+        }
+
+        if (prefix.empty()) {
+            continue;
+        }
+
+        if (_wcsicmp(normalizedArchivePath.c_str(), prefix.c_str()) == 0) {
+            return true;
+        }
+
+        const std::wstring prefixWithSeparator = prefix + L"\\";
+        if (StartsWithNoCase(normalizedArchivePath, prefixWithSeparator)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 }
 
 CUnZip7z::CUnZip7z()
@@ -227,7 +273,7 @@ int CUnZip7z::getunzipfilenum(ResourceHandler* resHandler)
 
 	res = SzArEx_Open(&db, &lookIn.vtbl, &allocImp, &allocTempImp);
 
-	// 如果没有打开成功,就不会有文件; 
+	// No files are available if the archive cannot be opened.
 	if (SZ_OK == res) {
 		nsize = db.NumFiles;
 	}
@@ -240,7 +286,7 @@ int CUnZip7z::getunzipfilenum(ResourceHandler* resHandler)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // 
-int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, const std::wstring &mUnPackPath, HWND callback, UINT Msg, UINT nNotifyID)
+int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, const std::wstring &mUnPackPath, HWND callback, UINT Msg, UINT nNotifyID, const std::vector<std::wstring>& skipPrefixes)
 {
 	LPCTSTR lpszOutputPath = mUnPackPath.c_str();
 	if (!FolderExist(mUnPackPath)) {
@@ -296,6 +342,11 @@ int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, const std::wstring &mUn
         std::wstring archivePath(reinterpret_cast<wchar_t*>(fileNameBuffer.data()));
         wcsncpy_s(pNotifyMsg->szFileName, _countof(pNotifyMsg->szFileName), archivePath.c_str(), _TRUNCATE);
 
+        if (ShouldSkipArchivePath(archivePath, skipPrefixes)) {
+            PostMessage(callback, Msg, nNotifyID, (LPARAM)pNotifyMsg);
+            continue;
+        }
+
 		if (!pNotifyMsg->isDir) {
 			res = SzArEx_Extract(&db, &lookIn.vtbl, i, &blockIndex, &outBuffer, &outBufferSize,
 				&offset, &outSizeProcessed, &allocImp, &allocTempImp);
@@ -349,8 +400,8 @@ int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, const std::wstring &mUn
                         res = SZ_ERROR_FAIL;
                         APPLOG(Log::LOG_ERROR)("\n---unzip_7z_file: OutFile_OpenW error, filename : %s ,last error:%lu---\n", WtoS(fullPath).c_str(), dLastError);
                         CDuiString msg;
-                        msg.Format(_T("写入文件:<%s>失败"), fullPath.c_str());
-                        int ret = MessageBox(NULL, msg, _T("错误提示"), MB_ABORTRETRYIGNORE);
+                        msg.Format(_T("\x5199\x5165\x6587\x4EF6:<%s>\x5931\x8D25"), fullPath.c_str());
+                        int ret = MessageBox(NULL, msg, _T("\x9519\x8BEF\x63D0\x793A"), MB_ABORTRETRYIGNORE);
                         if (ret == IDRETRY) {
                             continue;
                         }
@@ -395,11 +446,11 @@ int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, const std::wstring &mUn
 	return res;
 }
 
-///////////////////////////////////////////////////////////////////////////// 
-// 函数说明: 检查指定的文件夹是否存在 ;
-// 参数说明: [in]：strPath 检查的文件夹 (此方法会主动向路径末尾添加*.*) ;
-// 返回值:BOOL类型,存在返回TRUE,否则为FALSE ;
-///////////////////////////////////////////////////////////////////////////// 
+/////////////////////////////////////////////////////////////////////////////
+// Check whether a directory exists.
+// Input: strPath is the directory path to check.
+// Return: TRUE when it exists, otherwise FALSE.
+/////////////////////////////////////////////////////////////////////////////
 BOOL CUnZip7z::FolderExist(const std::wstring& strPath)
 {
 	std::wstring sCheckPath = strPath;
@@ -418,7 +469,7 @@ BOOL CUnZip7z::FolderExist(const std::wstring& strPath)
 	if ((hFind != INVALID_HANDLE_VALUE) &&
 		(wfd.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY) || (wfd.dwFileAttributes&FILE_ATTRIBUTE_ARCHIVE))
 	{
-		//如果存在并类型是文件夹 ;
+		// Existing directory (or an existing file matched by *.*).
 		rValue = TRUE;
 	}
 
@@ -426,10 +477,11 @@ BOOL CUnZip7z::FolderExist(const std::wstring& strPath)
 	return rValue;
 }
 
-///////////////////////////////////////////////////////////////////////////// 
-// 函数说明: 创建多级目录 ;
-// 参数说明: [in]： 路径字符串 ;
-// 返回值: BOOL 成功True 失败False ;///////////////////////////////////////////////////////////////////////////// 
+/////////////////////////////////////////////////////////////////////////////
+// Create nested directories.
+// Input: Directoryname is the target path.
+// Return: TRUE on success, FALSE on failure.
+/////////////////////////////////////////////////////////////////////////////
 BOOL CUnZip7z::CreatedMultipleDirectory(std::wstring Directoryname)
 {
     return EnsureDirectoryTree(Directoryname) ? TRUE : FALSE;
