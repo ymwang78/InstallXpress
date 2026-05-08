@@ -1,4 +1,5 @@
 ﻿#include "stdafx.h"
+#include <atomic>
 #include "MainFrame.h"
 #include "Utility\DirUtility.h"
 #include "Utility\RegOperation.h"
@@ -174,7 +175,14 @@ LRESULT CMainFrame::HandleCustomMessage(UINT uMsg, WPARAM wParam, LPARAM lParam,
 {
 	if (WM_INSTALLPROGRES_MSG == uMsg) {
         int nNotifyID = (int)wParam;
-        if (lParam != (LPARAM) - 1) {
+        if (lParam == (LPARAM)-2) {
+            // Parallel extraction failed
+            APPLOG(Log::LOG_ERROR)("Installation failed during extraction\n");
+            if (m_pProgress) m_pProgress->SetText(_T("安装失败"));
+            if (m_pCloseBtn) m_pCloseBtn->SetEnabled(true);
+            bHandled = TRUE;
+        }
+        else if (lParam != (LPARAM)-1) {
             notify_msg_t* pNotifyMsg = (notify_msg_t*)lParam;
             m_luaPtr->OnUnzipProgress(pNotifyMsg->nNotifyID, pNotifyMsg->totalFileNum, pNotifyMsg->currentFileIndex, pNotifyMsg->totalSize, pNotifyMsg->currentSize);
             delete pNotifyMsg;
@@ -301,15 +309,34 @@ int CMainFrame::UnzipFileAsync(const std::wstring& strZipFile, const std::wstrin
 
 int CMainFrame::UnzipFileAsync(const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir, const std::vector<std::wstring>& skipPrefixes)
 {
+    // Pre-load all resources on the main thread (thread-safe access to m_resHandlerMap)
+    std::vector<ResourceHandler*> resources;
+    resources.reserve(resourceIDs.size());
     for (UINT id : resourceIDs) {
-        if (0 == FindResource(m_PaintManager.GetResourceDll(), MAKEINTRESOURCE(id), _T("INSTALLSOFT")))
+        ResourceHandler* r = LoadResourceFile(id, _T("INSTALLSOFT"));
+        if (r == nullptr) {
+            APPLOG(Log::LOG_ERROR)("UnzipFileAsync: resource %u not found\n", id);
             return -1;
+        }
+        resources.push_back(r);
     }
-    InstallXpress_Unzip_Context_t* ctx(new InstallXpress_Unzip_Context_t{});
-    ctx->nResourceIDs = resourceIDs;
-    ctx->skipPrefixes = skipPrefixes;
-    ctx->strUnzipDir = strUnzipDir;
-    m_hThread = (HANDLE)_beginthreadex(NULL, 0, &CMainFrame::InstallThread, ctx, 0, NULL);
+
+    // Dispatch to parallel extractor via a single coordinating thread
+    struct CoordCtx {
+        CMainFrame* frame;
+        std::vector<ResourceHandler*> resources;
+        std::vector<UINT> resourceIDs;
+        std::wstring unzipDir;
+        std::vector<std::wstring> skipPrefixes;
+    };
+    auto* coord = new CoordCtx{ this, resources, resourceIDs, strUnzipDir, skipPrefixes };
+
+    m_hThread = (HANDLE)_beginthreadex(NULL, 0, [](void* p) -> unsigned {
+        auto* c = static_cast<CoordCtx*>(p);
+        c->frame->InstallZipParallel(c->resources, c->resourceIDs, c->unzipDir, c->skipPrefixes);
+        delete c;
+        return 0;
+    }, coord, 0, NULL);
     return 0;
 }
 
@@ -394,6 +421,78 @@ ResourceHandler* CMainFrame::LoadResourceFile(UINT uId, LPCTSTR lpType)
 	}
 	m_resHandlerMap.insert(std::make_pair(uId, handler));
 	return handler;
+}
+
+void CMainFrame::InstallZipParallel(
+    const std::vector<ResourceHandler*>& resources,
+    const std::vector<UINT>& resourceIDs,
+    const std::wstring& strUnzipDir,
+    const std::vector<std::wstring>& skipPrefixes)
+{
+    if (resources.empty()) return;
+
+    struct WorkerCtx {
+        ResourceHandler* resource;
+        UINT resourceID;
+        std::wstring unzipDir;
+        std::vector<std::wstring> skipPrefixes;
+        HWND hWnd;
+        std::atomic<int>* remaining;
+        std::atomic<bool>* anyFailed;
+    };
+
+    auto* remaining  = new std::atomic<int>((int)resources.size());
+    auto* anyFailed  = new std::atomic<bool>(false);
+
+    std::vector<HANDLE> threads;
+    threads.reserve(resources.size());
+
+    for (int i = 0; i < (int)resources.size(); ++i) {
+        auto* ctx = new WorkerCtx{
+            resources[i],
+            resourceIDs[i],
+            strUnzipDir,
+            skipPrefixes,
+            this->GetHWND(),
+            remaining,
+            anyFailed
+        };
+
+        HANDLE h = (HANDLE)_beginthreadex(NULL, 0, [](void* p) -> unsigned {
+            auto* c = static_cast<WorkerCtx*>(p);
+            CUnZip7z unzip;
+            int ret = unzip.unzip_7z_file(
+                c->resource, c->unzipDir,
+                c->hWnd, WM_INSTALLPROGRES_MSG,
+                (int)c->resourceID, c->skipPrefixes);
+
+            if (ret != 0) {
+                APPLOG(Log::LOG_ERROR)("InstallZipParallel: extraction failed for resource %u (ret=%d)\n", c->resourceID, ret);
+                c->anyFailed->store(true);
+            }
+
+            if (--(*(c->remaining)) == 0) {
+                // Last thread: signal completion or failure
+                if (!c->anyFailed->load()) {
+                    ::PostMessage(c->hWnd, WM_INSTALLPROGRES_MSG, (WPARAM)c->resourceID, -1);
+                } else {
+                    // Post a failure notification so the UI can react
+                    ::PostMessage(c->hWnd, WM_INSTALLPROGRES_MSG, 0, -2);
+                }
+                delete c->remaining;
+                delete c->anyFailed;
+            }
+            delete c;
+            return 0u;
+        }, ctx, 0, NULL);
+
+        if (h) threads.push_back(h);
+    }
+
+    // Wait for all worker threads so the coordinating thread can clean up handles
+    if (!threads.empty())
+        WaitForMultipleObjects((DWORD)threads.size(), threads.data(), TRUE, INFINITE);
+    for (HANDLE h : threads) CloseHandle(h);
 }
 
 void CMainFrame::SplitStringW(const WCHAR *pSrc, WCHAR chMark, std::vector<std::wstring> &vecStrings, BOOL bOnce)

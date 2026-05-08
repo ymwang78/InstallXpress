@@ -2,6 +2,20 @@
 
 #include <wtypes.h>
 
+// Conventional resource ID layout for InstallXpress projects.
+// Each project defines these in its own resource.h; these values document
+// the expected slot assignments so Lua scripts can reference named constants.
+namespace InstallXpress {
+    constexpr int RESID_ICON        = 107;  // IDI_INSTALL
+    constexpr int RESID_SKIN_XML    = 131;  // IDR_MAIN_XML
+    constexpr int RESID_LICENSE     = 133;  // IDR_REGCONTENT1
+    constexpr int RESID_SOFT1       = 134;  // IDR_INSTALLSOFT1 (primary package)
+    constexpr int RESID_LUA_SCRIPT  = 135;  // IDR_LUA_SCRIPT
+    constexpr int RESID_BACKGROUND  = 138;  // IDB_RES_BACKGROUND
+    constexpr int RESID_SOFT2       = 139;  // IDR_INSTALLSOFT2
+    constexpr int RESID_SOFT3       = 140;  // IDR_INSTALLSOFT3
+}
+
 #ifdef __cplusplus
 extern "C" {
 #endif
