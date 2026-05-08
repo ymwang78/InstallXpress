@@ -72,16 +72,12 @@ bool mkdir_p(const std::wstring& path) {
         currentPath = normalizedPath.substr(0, pos++);
         if (currentPath.empty()) continue; // 如果是绝对路径，第一个会是空的
 
-        // 尝试创建目录
         if (portable_mkdir(currentPath.c_str()) && errno != EEXIST) {
-            //std::cerr << "Error creating directory: " << currentPath << std::endl;
             return false;
         }
     }
 
-    // 创建最后一级目录
     if (portable_mkdir(normalizedPath.c_str()) && errno != EEXIST) {
-        //std::cerr << "Error creating directory: " << normalizedPath << std::endl;
         return false;
     }
 
@@ -134,16 +130,12 @@ static int l_DiskFreeSpace(lua_State * L)
         GetSystemDirectory(str, MAX_PATH);
         if (GetDiskFreeSpaceEx(str, &freeBytesAvailable, &totalNumberOfBytes, &totalNumberOfFreeBytes)) {
             lua_pushinteger(L, freeBytesAvailable.QuadPart);
-            //lua_pushinteger(L, totalNumberOfBytes.QuadPart);
-            //lua_pushinteger(L, totalNumberOfFreeBytes.QuadPart);
             return 1;
         }
     }
     else {
         if (GetDiskFreeSpaceEx(Utf82Unicode(path).c_str(), &freeBytesAvailable, &totalNumberOfBytes, &totalNumberOfFreeBytes)) {
             lua_pushinteger(L, freeBytesAvailable.QuadPart);
-            //lua_pushinteger(L, totalNumberOfBytes.QuadPart);
-            //lua_pushinteger(L, totalNumberOfFreeBytes.QuadPart);
             return 1;
         }
     }
@@ -530,9 +522,6 @@ static int l_FilePathCreateShortCut(lua_State * L)
     plink->SetPath(Utf82Unicode(target).c_str());
     plink->SetWorkingDirectory(Utf82Unicode(workdir).c_str());
     plink->SetDescription(Utf82Unicode(description).c_str());
-    //plink->SetIconLocation(Utf82Unicode(icon).c_str(), 0);
-    //plink->SetHotkey((WORD)atoi(hotkey));
-    //plink->SetShowCmd(atoi(showcmd));
 
     if (SUCCEEDED(ppf->Save(Utf82Unicode(lnk).c_str(), TRUE))) {
         ppf->Release();
@@ -661,8 +650,6 @@ static int l_FilePathMakeDir(lua_State * L)
 extern "C"
 static int l_FilePathUnzipAsync(lua_State * L)
 {
-    //FilePathUnzip(zipFile, destDir, NotifyID)
-    //FilePathUnzip({resID1, resID2, ...}, destDir, {"skip\\prefix"})
     if (lua_istable(L, 1)) {
         const char* destDir = luaL_checkstring(L, 2);
         if (destDir == nullptr) {
@@ -1000,7 +987,6 @@ static bool SetSysEnvironmentVariable(const wchar_t* name, const wchar_t* value)
     HKEY hKey;
     DWORD dwDisposition;
 
-    //if (RegCreateKeyEx(HKEY_CURRENT_USER, TEXT("Environment"),
     if (RegCreateKeyEx(HKEY_LOCAL_MACHINE, TEXT("SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"),
         0, NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hKey, &dwDisposition) != ERROR_SUCCESS) {
         return false;
@@ -1060,7 +1046,6 @@ static int l_SysPathAdd(lua_State* L)
     CRegKey regKey;
     APPLOG(LOG_TRACE)("%s: %s\n", "SysPathAdd", newPath);
 
-    //LONG result = regKey.Open(HKEY_CURRENT_USER, TEXT("Environment"), KEY_READ | KEY_WRITE);
     LONG result = regKey.Open(HKEY_LOCAL_MACHINE, TEXT("SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"), KEY_READ | KEY_WRITE);
     if (result != ERROR_SUCCESS) {
         lua_pushboolean(L, 0);
@@ -1265,7 +1250,6 @@ int lua_base::load_string(const char* cstr)
 }
 
 //////////////////////////////////////////////////////////////////////////
-//    const std::wstring& ver = CMainFrame::GetInstance()->DirUtility().Version();
 
 InstallLua::InstallLua(DuiLib::CPaintManagerUI* pPaingManger, const std::string& version)
 {

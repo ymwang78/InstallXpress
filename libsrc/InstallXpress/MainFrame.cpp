@@ -139,12 +139,6 @@ LRESULT CMainFrame::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 		}
 		else if (WMEXPROCESS_TIMER == wParam)
 		{
-			//if (m_nOldProcess == m_nProcess && m_nProcess < 99)
-			//{
-			//	int nProcess = m_nProcess + 1;
-			//	nProcess = nProcess > 100 ? 100 : nProcess;
-			//	UpdateProcess(nProcess);
-			//}
 		}
 		else if (WMPROGRESSFINISH_TIMER == wParam)
 		{
@@ -211,9 +205,6 @@ void CMainFrame::WindowInitialized()
 	SetIcon(m_pInit->nResourceIDIcon);
 
     m_luaPtr = new InstallLua(&m_PaintManager, UnicodeToUtf8(DirUtility().Version()));
-#if 0 //ndef _DEBUG
-    m_luaPtr->load_file("Install.lua");
-#else
     ResourceHandler* luaScript = LoadResourceFile(m_pInit->nResourceIDLua, _T("LUA_SCRIPT"));
     const char* script = (const char*) luaScript->GetData();
     if (script) {
@@ -222,13 +213,11 @@ void CMainFrame::WindowInitialized()
     else {
         APPLOG(Log::LOG_ERROR)("Load lua script failed");
     }
-#endif
     m_luaPtr->OnInitialize();
 
 	m_pTipLabel = static_cast<CLabelUI*>(m_PaintManager.FindControl(_T("errortiplab")));
 	m_pCloseBtn = static_cast<CButtonUI*>(m_PaintManager.FindControl(_T("closebtn")));
 	m_pProgress = static_cast<CProgressUI*>(m_PaintManager.FindControl(_T("installprogress")));
-	//if (m_bupdate) InstallSetup(); //更新直接安装;
 }
 
 void CMainFrame::_OnClickBtn(TNotifyUI &msg)
@@ -355,13 +344,10 @@ void CMainFrame::InstallZip(const std::vector<UINT>& resourceIDs, const std::wst
 
 void CMainFrame::InstallZip(UINT nResourceID, const std::wstring& strUnzipDir, int nNotifyID)
 {
-	bool bInstallPiu = true;
-	bool bNewInstall = false;
 	m_pProgress->SetValue(0);
 
     UINT uId[] = { nResourceID };
     bool bInstallFinish = true;
-	////////////////////////////////////	
 	for (unsigned i = 0; i < sizeof(uId) / sizeof(uId[0]); ++i) {
         DWORD dwSize = 0;
         ResourceHandler* pInstallContent = LoadResourceFile(uId[i], _T("INSTALLSOFT"));
@@ -381,13 +367,8 @@ void CMainFrame::InstallZip(UINT nResourceID, const std::wstring& strUnzipDir, i
         ::PostMessage(this->GetHWND(), WM_INSTALLPROGRES_MSG, nNotifyID, -1);
 	}
 	else {
-		CDuiString str =/* m_bupdate ? _T("更新失败") :*/ _T("安装失败");
-		if (bNewInstall) {
-			if (m_pTipLabel) m_pTipLabel->SetText(str.GetData());
-		}
-		else {
-			m_pProgress->SetText(str.GetData());
-		}
+		CDuiString str = _T("安装失败");
+		m_pProgress->SetText(str.GetData());
 		if (m_pCloseBtn) m_pCloseBtn->SetEnabled(true);
 		return;
 	}
