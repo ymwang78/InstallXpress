@@ -53,7 +53,6 @@ BOOL TryElevate()
         if (dwError == ERROR_CANCELLED) {
             return FALSE;
         }
-        //@todo log reason?
         return FALSE;
     }
     else {
