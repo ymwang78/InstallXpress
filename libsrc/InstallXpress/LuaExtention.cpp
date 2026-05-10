@@ -1,15 +1,17 @@
 ﻿#include "stdafx.h"
 #include <windows.h>
+#include <wininet.h>
+#pragma comment(lib, "Wininet.lib")
 #include "Utility/TypeConvertUtil.h"
 #include "LuaExtention.h"
 #include <ShlObj_core.h>
 #include <sstream>
 #include <iostream>
 #include <string>
-#include <sys/stat.h> // For stat().
-#include <sys/types.h> // For mkdir() on Unix/Linux.
+#include <sys/stat.h>
+#include <sys/types.h>
 #ifdef _WIN32
-#include <direct.h> // For _mkdir() on Windows.
+#include <direct.h>
 #endif
 #include <atlbase.h>
 
@@ -22,6 +24,9 @@
 static DuiLib::CPaintManagerUI* _pPaintManager = NULL;
 
 static std::string _strVersion;
+
+// Path to the per-installer state INI file (set during InstallLua construction)
+static std::wstring _strStateFile;
 
 static std::string luas_dumpstack(lua_State* L, const char* fname)
 {
@@ -1091,6 +1096,168 @@ static int l_SysPathAdd(lua_State* L)
     return 1;
 }
 
+// ── System information queries ────────────────────────────────────────────
+
+extern "C"
+static int l_SysIsWin10OrLater(lua_State* L)
+{
+    OSVERSIONINFOEXW osvi = { sizeof(osvi) };
+    osvi.dwMajorVersion = 10;
+    DWORDLONG mask = VerSetConditionMask(0, VER_MAJORVERSION, VER_GREATER_EQUAL);
+    lua_pushboolean(L, VerifyVersionInfoW(&osvi, VER_MAJORVERSION, mask) != 0);
+    return 1;
+}
+
+extern "C"
+static int l_SysGetArch(lua_State* L)
+{
+    SYSTEM_INFO si;
+    GetNativeSystemInfo(&si);
+    switch (si.wProcessorArchitecture) {
+    case PROCESSOR_ARCHITECTURE_AMD64: lua_pushstring(L, "x64");   break;
+    case PROCESSOR_ARCHITECTURE_ARM64: lua_pushstring(L, "arm64"); break;
+    case PROCESSOR_ARCHITECTURE_INTEL: lua_pushstring(L, "x86");   break;
+    default:                           lua_pushstring(L, "unknown"); break;
+    }
+    return 1;
+}
+
+extern "C"
+static int l_SysNetworkAvailable(lua_State* L)
+{
+    DWORD flags = 0;
+    lua_pushboolean(L, InternetGetConnectedState(&flags, 0) == TRUE);
+    return 1;
+}
+
+extern "C"
+static int l_SysGetInstalledSoftware(lua_State* L)
+{
+    const char* name = luaL_checkstring(L, 1);
+    if (name == nullptr) { lua_pushnil(L); return 1; }
+    std::wstring wname = Utf82Unicode(name);
+    const wchar_t* kUninstallSubkey = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\";
+
+    // Query both 64-bit and 32-bit registry views explicitly so the result is
+    // correct regardless of whether this process is 32-bit or 64-bit.
+    const REGSAM views[] = { KEY_READ | KEY_WOW64_64KEY, KEY_READ | KEY_WOW64_32KEY };
+    for (REGSAM sam : views) {
+        std::wstring path = std::wstring(kUninstallSubkey) + wname;
+        HKEY hKey;
+        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, path.c_str(), 0, sam, &hKey) == ERROR_SUCCESS) {
+            wchar_t ver[256] = {};
+            DWORD sz = sizeof(ver);
+            RegQueryValueExW(hKey, L"DisplayVersion", NULL, NULL, (LPBYTE)ver, &sz);
+            RegCloseKey(hKey);
+            lua_pushstring(L, UnicodeToUtf8(ver).c_str());
+            return 1;
+        }
+    }
+    lua_pushnil(L);
+    return 1;
+}
+
+// ── Install state persistence ─────────────────────────────────────────────
+
+extern "C"
+static int l_StateWrite(lua_State* L)
+{
+    const char* key   = luaL_checkstring(L, 1);
+    const char* value = luaL_checkstring(L, 2);
+    if (key == nullptr || value == nullptr || _strStateFile.empty()) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+    BOOL ok = WritePrivateProfileStringW(
+        L"State",
+        Utf82Unicode(key).c_str(),
+        Utf82Unicode(value).c_str(),
+        _strStateFile.c_str());
+    lua_pushboolean(L, ok != 0);
+    return 1;
+}
+
+extern "C"
+static int l_StateRead(lua_State* L)
+{
+    const char* key = luaL_checkstring(L, 1);
+    if (key == nullptr || _strStateFile.empty()) { lua_pushnil(L); return 1; }
+    wchar_t buf[1024] = {};
+    DWORD len = GetPrivateProfileStringW(
+        L"State",
+        Utf82Unicode(key).c_str(),
+        L"",
+        buf, (DWORD)std::size(buf),
+        _strStateFile.c_str());
+    if (len == 0) { lua_pushnil(L); return 1; }
+    lua_pushstring(L, UnicodeToUtf8(buf).c_str());
+    return 1;
+}
+
+extern "C"
+static int l_CheckpointSet(lua_State* L)
+{
+    const char* phase = luaL_checkstring(L, 1);
+    if (phase == nullptr || _strStateFile.empty()) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+    BOOL ok = WritePrivateProfileStringW(
+        L"Checkpoint", L"Phase",
+        Utf82Unicode(phase).c_str(),
+        _strStateFile.c_str());
+    lua_pushboolean(L, ok != 0);
+    return 1;
+}
+
+extern "C"
+static int l_CheckpointGet(lua_State* L)
+{
+    if (_strStateFile.empty()) { lua_pushnil(L); return 1; }
+    wchar_t buf[256] = {};
+    DWORD len = GetPrivateProfileStringW(
+        L"Checkpoint", L"Phase", L"",
+        buf, (DWORD)std::size(buf),
+        _strStateFile.c_str());
+    if (len == 0) { lua_pushnil(L); return 1; }
+    lua_pushstring(L, UnicodeToUtf8(buf).c_str());
+    return 1;
+}
+
+// Embedded base library loaded into every installer Lua state.
+// Content mirrors install_base.lua (kept in sync manually).
+static const char g_install_base_lua[] = R"LUA(
+HRootKey = {
+    HKEY_CLASSES_ROOT   = 0,
+    HKEY_CURRENT_USER   = 1,
+    HKEY_LOCAL_MACHINE  = 2,
+    HKEY_USERS          = 3,
+    HKEY_CURRENT_CONFIG = 4,
+}
+CSIDL = {
+    DESKTOP=0, PROGRAMS=2, CONTROLS=3, PRINTERS=4, PERSONAL=5,
+    FAVORITES=6, STARTUP=7, RECENT=8, SENDTO=9, STARTMENU=11,
+    MYDOCUMENTS=5, MYMUSIC=13, MYVIDEO=14, DESKTOPDIRECTORY=16,
+    DRIVES=17, NETWORK=18, NETHOOD=19, FONTS=20, TEMPLATES=21,
+    COMMON_STARTMENU=22, COMMON_PROGRAMS=23, COMMON_STARTUP=24,
+    COMMON_DESKTOPDIRECTORY=25, APPDATA=26, PRINTHOOD=27, PROGRAM_FILES=38,
+}
+function RunBatchFile(batchPath, waitSeconds)
+    if not installx.FilePathExists(batchPath) then
+        installx.LogPrint("Skip missing batch file: " .. batchPath)
+        return false
+    end
+    local command = 'cmd.exe /S /C call "' .. batchPath .. '"'
+    installx.LogPrint("RunBatchFile: " .. command)
+    return installx.ProcessExecute(command, false, waitSeconds or 30)
+end
+function ErrorHint(msg)
+    installx.LogPrint("[Error] " .. tostring(msg))
+    installx.DuiText("errortiplab", tostring(msg))
+    installx.DuiVisible("errortiplab", true)
+end
+)LUA";
+
 static const luaL_Reg reglib[] = {
     {"DiskFreeSpace", l_DiskFreeSpace},
     {"DuiEnable", l_DuiEnable},
@@ -1127,9 +1294,17 @@ static const luaL_Reg reglib[] = {
 
     {"SysACP", l_SysACP},
     {"SysEnvSet", l_SysEnvSet},
+    {"SysGetArch", l_SysGetArch},
+    {"SysGetInstalledSoftware", l_SysGetInstalledSoftware},
+    {"SysIsWin10OrLater", l_SysIsWin10OrLater},
+    {"SysNetworkAvailable", l_SysNetworkAvailable},
     {"SysPathAdd", l_SysPathAdd},
 
-    // 添加其他函数
+    {"StateRead", l_StateRead},
+    {"StateWrite", l_StateWrite},
+    {"CheckpointGet", l_CheckpointGet},
+    {"CheckpointSet", l_CheckpointSet},
+
     {NULL, NULL}
 };
 
@@ -1202,10 +1377,25 @@ void lua_function_base::push_value(lua_State* vm, const std::string& s)
 
 void lua_function_base::call(int args, int results)
 {
-    int status = lua_pcall(m_vm, args, results, 0);
+    // Push traceback handler before args/function
+    lua_pushcfunction(m_vm, [](lua_State* L) -> int {
+        luaL_traceback(L, L, lua_tostring(L, 1), 1);
+        return 1;
+    });
+    // Move handler below function and args: stack is [handler, func, args...]
+    lua_insert(m_vm, -(args + 2));
+
+    int handlerIdx = lua_gettop(m_vm) - args - 1;
+    int status = lua_pcall(m_vm, args, results, handlerIdx);
+    lua_remove(m_vm, handlerIdx); // remove handler
+
     if (status != 0) {
-        OutputDebugStringA(luas_dumpstack(m_vm, "load_string").c_str());
-        std::string error = lua_tostring(m_vm, -1);
+        const char* err = lua_tostring(m_vm, -1);
+        if (err) {
+            APPLOG(Log::LOG_ERROR)("[Lua] %s\n", err);
+            OutputDebugStringA(err);
+            OutputDebugStringA("\n");
+        }
         lua_pop(m_vm, 1);
     }
 }
@@ -1220,6 +1410,13 @@ lua_base::lua_base()
     lua_setfield(lua_, LUA_REGISTRYINDEX, "installx.vm");
     luaL_requiref(lua_, "installx", luaopen_reg, 1);
     lua_pop(lua_, 1);
+
+    // Load the embedded base library (HRootKey, CSIDL, RunBatchFile, ErrorHint)
+    if (luaL_dostring(lua_, g_install_base_lua) != LUA_OK) {
+        const char* err = lua_tostring(lua_, -1);
+        OutputDebugStringA(err ? err : "installx base library load failed");
+        lua_pop(lua_, 1);
+    }
 }
 
 lua_base::~lua_base()
@@ -1243,7 +1440,12 @@ int lua_base::load_string(const char* cstr)
 {
     int ret = luaL_dostring(lua_, cstr);
     if (ret != 0) {
-        OutputDebugStringA(luas_dumpstack(lua_, "load_string").c_str());
+        const char* err = lua_tostring(lua_, -1);
+        std::string msg = err ? err : "unknown error";
+        lua_pop(lua_, 1);
+        APPLOG(Log::LOG_ERROR)("[Lua] Script load error: %s\n", msg.c_str());
+        OutputDebugStringA(("[Lua] " + msg + "\n").c_str());
+        MessageBoxA(NULL, msg.c_str(), "Lua Script Error", MB_OK | MB_ICONERROR);
         return -1;
     }
     return 0;
@@ -1255,6 +1457,24 @@ InstallLua::InstallLua(DuiLib::CPaintManagerUI* pPaingManger, const std::string&
 {
     _pPaintManager = pPaingManger;
     _strVersion = version;
+
+    // Derive a per-installer state file path from the window title.
+    // Stored in %TEMP%\InstallXpress\<title>.state
+    wchar_t tempDir[MAX_PATH] = {};
+    GetTempPathW(MAX_PATH, tempDir);
+    std::wstring stateDir = std::wstring(tempDir) + L"InstallXpress\\";
+    CreateDirectoryW(stateDir.c_str(), NULL);
+    std::wstring title = Utf82Unicode(version);
+    // Sanitize: replace all characters invalid in Windows file names with '_'
+    for (wchar_t& c : title) {
+        if (c == L'\\' || c == L'/' || c == L':' || c == L'*' || c == L'?' ||
+            c == L'"'  || c == L'<' || c == L'>' || c == L'|')
+            c = L'_';
+    }
+    // Trim trailing dots and spaces (also illegal in Windows file names)
+    while (!title.empty() && (title.back() == L'.' || title.back() == L' '))
+        title.pop_back();
+    _strStateFile = stateDir + title + L".state";
 }
 
 InstallLua::~InstallLua()

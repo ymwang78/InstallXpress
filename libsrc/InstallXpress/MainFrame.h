@@ -38,6 +38,7 @@ public:
 	int  UnzipFileAsync(const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir, const std::vector<std::wstring>& skipPrefixes = {});
 	void InstallZip(UINT nResourceID, const std::wstring& strUnzipDir, int nNotifyID);
 	void InstallZip(const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir, const std::vector<std::wstring>& skipPrefixes = {});
+	void InstallZipParallel(const std::vector<ResourceHandler*>& resources, const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir, const std::vector<std::wstring>& skipPrefixes);
 	void SplitStringW(const WCHAR *pSrc, WCHAR chMark, std::vector<std::wstring> &vecStrings, BOOL bOnce);
 	
 public:
