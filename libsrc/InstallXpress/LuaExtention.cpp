@@ -8,7 +8,6 @@
 #include <sstream>
 #include <iostream>
 #include <string>
-#include <atomic>
 #include <sys/stat.h>
 #include <sys/types.h>
 #ifdef _WIN32
@@ -1137,14 +1136,15 @@ static int l_SysGetInstalledSoftware(lua_State* L)
     const char* name = luaL_checkstring(L, 1);
     if (name == nullptr) { lua_pushnil(L); return 1; }
     std::wstring wname = Utf82Unicode(name);
-    const wchar_t* bases[] = {
-        L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\",
-        L"SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\",
-    };
-    for (const auto* base : bases) {
-        std::wstring path = std::wstring(base) + wname;
+    const wchar_t* kUninstallSubkey = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\";
+
+    // Query both 64-bit and 32-bit registry views explicitly so the result is
+    // correct regardless of whether this process is 32-bit or 64-bit.
+    const REGSAM views[] = { KEY_READ | KEY_WOW64_64KEY, KEY_READ | KEY_WOW64_32KEY };
+    for (REGSAM sam : views) {
+        std::wstring path = std::wstring(kUninstallSubkey) + wname;
         HKEY hKey;
-        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, path.c_str(), 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, path.c_str(), 0, sam, &hKey) == ERROR_SUCCESS) {
             wchar_t ver[256] = {};
             DWORD sz = sizeof(ver);
             RegQueryValueExW(hKey, L"DisplayVersion", NULL, NULL, (LPBYTE)ver, &sz);
@@ -1465,11 +1465,15 @@ InstallLua::InstallLua(DuiLib::CPaintManagerUI* pPaingManger, const std::string&
     std::wstring stateDir = std::wstring(tempDir) + L"InstallXpress\\";
     CreateDirectoryW(stateDir.c_str(), NULL);
     std::wstring title = Utf82Unicode(version);
-    // Sanitize: replace path-unsafe chars with '_'
+    // Sanitize: replace all characters invalid in Windows file names with '_'
     for (wchar_t& c : title) {
-        if (c == L'\\' || c == L'/' || c == L':' || c == L'*' || c == L'?')
+        if (c == L'\\' || c == L'/' || c == L':' || c == L'*' || c == L'?' ||
+            c == L'"'  || c == L'<' || c == L'>' || c == L'|')
             c = L'_';
     }
+    // Trim trailing dots and spaces (also illegal in Windows file names)
+    while (!title.empty() && (title.back() == L'.' || title.back() == L' '))
+        title.pop_back();
     _strStateFile = stateDir + title + L".state";
 }
 

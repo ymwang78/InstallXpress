@@ -1,7 +1,6 @@
 #pragma once
 
 #include <vector>
-#include <atomic>
 #include <Utility/DirUtility.h>
 #include <Utility/ResourceHandler.h>
 class InstallLua;

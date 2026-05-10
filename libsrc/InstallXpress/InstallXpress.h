@@ -5,6 +5,7 @@
 // Conventional resource ID layout for InstallXpress projects.
 // Each project defines these in its own resource.h; these values document
 // the expected slot assignments so Lua scripts can reference named constants.
+#ifdef __cplusplus
 namespace InstallXpress {
     constexpr int RESID_ICON        = 107;  // IDI_INSTALL
     constexpr int RESID_SKIN_XML    = 131;  // IDR_MAIN_XML
@@ -15,6 +16,7 @@ namespace InstallXpress {
     constexpr int RESID_SOFT2       = 139;  // IDR_INSTALLSOFT2
     constexpr int RESID_SOFT3       = 140;  // IDR_INSTALLSOFT3
 }
+#endif // __cplusplus
 
 #ifdef __cplusplus
 extern "C" {

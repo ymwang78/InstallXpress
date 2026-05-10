@@ -1,6 +1,10 @@
 -- InstallXpress base library
 -- Automatically loaded into every installer Lua state before the project script.
 -- Defines common constants and utility functions shared across all projects.
+--
+-- NOTE: The content of this file is also embedded as a C string literal in
+-- LuaExtention.cpp (g_install_base_lua). Keep both in sync when editing.
+-- TODO: Replace with CMake file(READ ...) to generate the C string automatically.
 
 -- Registry root key indices (matches _hRootKeyID[] in LuaExtention.cpp)
 HRootKey = {

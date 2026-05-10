@@ -116,6 +116,8 @@ function OnSelChanged(btnName, isSelected)
 end
 
 local _image_index = 0
+local _lastPercent = 0   -- prevents progress bar going backwards during parallel extraction
+
 -- SOFT1: 5%~55%; SOFT2: 55%~87%; SOFT3: 87%~92%
 function OnUnzipProgress(nNotifyID, nTotalFileNum, nCurFileIndex, nTotalSize, nCurrentSize)
 	local percent
@@ -128,6 +130,10 @@ function OnUnzipProgress(nNotifyID, nTotalFileNum, nCurFileIndex, nTotalSize, nC
 	else
 		return
 	end
+	-- Clamp to avoid backwards steps when packages extract in parallel
+	if percent <= _lastPercent then return end
+	_lastPercent = percent
+
 	local bgRes = "res='" .. RES.BACKGROUND .. "' restype='png'"
 	if _image_index < 3 and percent > 80 then
 		_image_index = 3

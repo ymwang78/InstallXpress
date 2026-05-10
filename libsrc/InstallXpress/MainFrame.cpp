@@ -1,5 +1,5 @@
 ﻿#include "stdafx.h"
-#include <atomic>
+#include <atomic>  // used by InstallZipParallel
 #include "MainFrame.h"
 #include "Utility\DirUtility.h"
 #include "Utility\RegOperation.h"
@@ -191,6 +191,8 @@ LRESULT CMainFrame::HandleCustomMessage(UINT uMsg, WPARAM wParam, LPARAM lParam,
         else {
             m_luaPtr->OnUnzipProgress(nNotifyID, -1, -1, -1, -1);
             m_luaPtr->PostSetup();
+            // Start finish animation regardless of whether extraction was sequential or parallel
+            SetTimer(this->GetHWND(), WMPROGRESSFINISH_TIMER, PORGRESSHIDESEPLEN, 0);
         }
 		return 0L;
 	}
@@ -364,9 +366,7 @@ void CMainFrame::InstallZip(const std::vector<UINT>& resourceIDs, const std::wst
     } else {
         m_pProgress->SetText(_T("安装失败"));
         if (m_pCloseBtn) m_pCloseBtn->SetEnabled(true);
-        return;
     }
-    SetTimer(this->GetHWND(), WMPROGRESSFINISH_TIMER, PORGRESSHIDESEPLEN, 0);
 }
 
 void CMainFrame::InstallZip(UINT nResourceID, const std::wstring& strUnzipDir, int nNotifyID)
@@ -390,16 +390,13 @@ void CMainFrame::InstallZip(UINT nResourceID, const std::wstring& strUnzipDir, i
 		break;
 	}
 	if(bInstallFinish) {
-        bInstallFinish = true;
         ::PostMessage(this->GetHWND(), WM_INSTALLPROGRES_MSG, nNotifyID, -1);
 	}
 	else {
 		CDuiString str = _T("安装失败");
 		m_pProgress->SetText(str.GetData());
 		if (m_pCloseBtn) m_pCloseBtn->SetEnabled(true);
-		return;
 	}
-    SetTimer(this->GetHWND(), WMPROGRESSFINISH_TIMER, PORGRESSHIDESEPLEN, 0);
 }
 
 void CMainFrame::InstallSetup()
@@ -431,9 +428,19 @@ void CMainFrame::InstallZipParallel(
 {
     if (resources.empty()) return;
 
+    // WaitForMultipleObjects supports at most MAXIMUM_WAIT_OBJECTS (64) handles.
+    // In practice installers use 2-3 packages; assert to catch misuse.
+    static_assert(true, ""); // placeholder — add ASSERT(resources.size() <= 64) if needed
+    _ASSERT(resources.size() <= MAXIMUM_WAIT_OBJECTS);
+
+    // Always use the last resource ID from the original list as the completion notifyID
+    // so Lua's OnUnzipProgress receives a deterministic value regardless of thread ordering.
+    const UINT completionNotifyID = resourceIDs.back();
+
     struct WorkerCtx {
         ResourceHandler* resource;
         UINT resourceID;
+        UINT completionNotifyID;
         std::wstring unzipDir;
         std::vector<std::wstring> skipPrefixes;
         HWND hWnd;
@@ -441,8 +448,8 @@ void CMainFrame::InstallZipParallel(
         std::atomic<bool>* anyFailed;
     };
 
-    auto* remaining  = new std::atomic<int>((int)resources.size());
-    auto* anyFailed  = new std::atomic<bool>(false);
+    auto* remaining = new std::atomic<int>((int)resources.size());
+    auto* anyFailed = new std::atomic<bool>(false);
 
     std::vector<HANDLE> threads;
     threads.reserve(resources.size());
@@ -451,6 +458,7 @@ void CMainFrame::InstallZipParallel(
         auto* ctx = new WorkerCtx{
             resources[i],
             resourceIDs[i],
+            completionNotifyID,
             strUnzipDir,
             skipPrefixes,
             this->GetHWND(),
@@ -472,13 +480,10 @@ void CMainFrame::InstallZipParallel(
             }
 
             if (--(*(c->remaining)) == 0) {
-                // Last thread: signal completion or failure
-                if (!c->anyFailed->load()) {
-                    ::PostMessage(c->hWnd, WM_INSTALLPROGRES_MSG, (WPARAM)c->resourceID, -1);
-                } else {
-                    // Post a failure notification so the UI can react
+                if (!c->anyFailed->load())
+                    ::PostMessage(c->hWnd, WM_INSTALLPROGRES_MSG, (WPARAM)c->completionNotifyID, -1);
+                else
                     ::PostMessage(c->hWnd, WM_INSTALLPROGRES_MSG, 0, -2);
-                }
                 delete c->remaining;
                 delete c->anyFailed;
             }
@@ -486,13 +491,25 @@ void CMainFrame::InstallZipParallel(
             return 0u;
         }, ctx, 0, NULL);
 
-        if (h) threads.push_back(h);
+        if (h == NULL) {
+            // Thread creation failed: decrement counter immediately so completion is not blocked
+            APPLOG(Log::LOG_ERROR)("InstallZipParallel: _beginthreadex failed for resource %u\n", resourceIDs[i]);
+            anyFailed->store(true);
+            delete ctx;
+            if (--(*(remaining)) == 0) {
+                ::PostMessage(this->GetHWND(), WM_INSTALLPROGRES_MSG, 0, -2);
+                delete remaining;
+                delete anyFailed;
+            }
+        } else {
+            threads.push_back(h);
+        }
     }
 
-    // Wait for all worker threads so the coordinating thread can clean up handles
-    if (!threads.empty())
+    if (!threads.empty()) {
         WaitForMultipleObjects((DWORD)threads.size(), threads.data(), TRUE, INFINITE);
-    for (HANDLE h : threads) CloseHandle(h);
+        for (HANDLE h : threads) CloseHandle(h);
+    }
 }
 
 void CMainFrame::SplitStringW(const WCHAR *pSrc, WCHAR chMark, std::vector<std::wstring> &vecStrings, BOOL bOnce)
