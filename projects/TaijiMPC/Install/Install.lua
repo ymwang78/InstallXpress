@@ -118,15 +118,25 @@ end
 local _image_index = 0
 local _lastPercent = 0   -- prevents progress bar going backwards during parallel extraction
 
--- SOFT1: 5%~55%; SOFT2: 55%~87%; SOFT3: 87%~92%
+-- Progress ranges based on actual 7z file sizes (Win32:163MB, WinPy312:1121MB, TaiJiDataSvc:29MB, total ~1312MB)
+-- SOFT1 (Win32.7z,  163MB): 5%~16%  (11 points, ~12%)
+-- SOFT2 (WinPy312.7z, 1121MB): 16%~90% (74 points, ~85%)
+-- SOFT3 (TaiJiDataSvc.7z, 29MB): 90%~92% (2 points, ~3%)
+
 function OnUnzipProgress(nNotifyID, nTotalFileNum, nCurFileIndex, nTotalSize, nCurrentSize)
+	-- If this is the callback with completion values (-1), skip updating progress here
+	if nCurFileIndex == -1 or nTotalFileNum == -1 then
+		return
+	end
+
 	local percent
+
 	if nNotifyID == RES.SOFT1 then
-		percent = 5 + math.floor(50 * nCurFileIndex / nTotalFileNum)
+		percent = 5 + math.floor(11 * nCurFileIndex / nTotalFileNum)
 	elseif nNotifyID == RES.SOFT2 then
-		percent = 55 + math.floor(32 * nCurFileIndex / nTotalFileNum)
+		percent = 16 + math.floor(74 * nCurFileIndex / nTotalFileNum)
 	elseif nNotifyID == RES.SOFT3 then
-		percent = 87 + math.floor(5 * nCurFileIndex / nTotalFileNum)
+		percent = 90 + math.floor(2 * nCurFileIndex / nTotalFileNum)
 	else
 		return
 	end
@@ -141,7 +151,7 @@ function OnUnzipProgress(nNotifyID, nTotalFileNum, nCurFileIndex, nTotalSize, nC
 	elseif _image_index < 2 and percent > 50 then
 		_image_index = 2
 		installx.DuiSetBkImage("mainlayout", bgRes .. " source='0,444,600,664' corner='300,208,5,5'")
-	elseif _image_index < 1 and percent > 20 then
+	elseif _image_index < 1 and percent > 15 then
 		_image_index = 1
 		installx.DuiSetBkImage("mainlayout", bgRes .. " source='0,222,600,442' corner='300,208,5,5'")
 	end
