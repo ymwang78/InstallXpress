@@ -6,6 +6,8 @@
 #include "7ZLookInStream.h"
 #include "Utility/ResourceHandler.h"
 #include <shellapi.h>
+#include <CommCtrl.h>
+#include <mutex>
 #pragma comment(lib, "shell32.lib")
 
 extern "C"
@@ -183,6 +185,106 @@ bool ShouldSkipArchivePath(const std::wstring& archivePath, const std::vector<st
     }
 
     return false;
+}
+
+// Remembered "apply to all" decision for file-write failures. Shared across all
+// parallel extraction threads so that repeated failures (e.g. many read-only
+// files) prompt the user only once. 0 = ask; otherwise holds IDIGNORE.
+std::mutex g_writeFailureMutex;
+int g_writeFailureChoice = 0;
+
+typedef HRESULT(WINAPI* TaskDialogIndirect_t)(const TASKDIALOGCONFIG*, int*, int*, BOOL*);
+
+// Loads comctl32 v6 (which exports TaskDialogIndirect) via an activation context
+// built from shell32's embedded manifest, so the dialog works regardless of the
+// host executable's own manifest. Returns true and fills *button / *applyToAll on
+// success; returns false when TaskDialog is unavailable so the caller can fall back.
+bool ShowWriteFailureTaskDialog(const std::wstring& filePath, int* button, bool* applyToAll)
+{
+    HMODULE shell32 = GetModuleHandleW(L"shell32.dll");
+    if (shell32 == NULL) {
+        shell32 = LoadLibraryW(L"shell32.dll");
+    }
+    if (shell32 == NULL) {
+        return false;
+    }
+
+    ACTCTXW actCtx{};
+    actCtx.cbSize = sizeof(actCtx);
+    actCtx.dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID | ACTCTX_FLAG_HMODULE_VALID;
+    actCtx.hModule = shell32;
+    actCtx.lpResourceName = MAKEINTRESOURCEW(124); // RT_MANIFEST id referencing comctl32 v6
+
+    HANDLE hCtx = CreateActCtxW(&actCtx);
+    ULONG_PTR cookie = 0;
+    bool activated = (hCtx != INVALID_HANDLE_VALUE) && ActivateActCtx(hCtx, &cookie);
+
+    HMODULE comctl = LoadLibraryW(L"comctl32.dll");
+    TaskDialogIndirect_t pTaskDialog =
+        comctl ? (TaskDialogIndirect_t)GetProcAddress(comctl, "TaskDialogIndirect") : nullptr;
+
+    bool shown = false;
+    if (pTaskDialog) {
+        const std::wstring content = L"\x5199\x5165\x6587\x4EF6:<" + filePath + L">\x5931\x8D25"; // write file:<path> failed
+
+        TASKDIALOG_BUTTON buttons[] = {
+            { IDRETRY,  L"\x91CD\x8BD5" },   // retry
+            { IDIGNORE, L"\x5FFD\x7565" },   // ignore
+            { IDABORT,  L"\x4E2D\x6B62" },   // abort
+        };
+
+        TASKDIALOGCONFIG cfg{};
+        cfg.cbSize = sizeof(cfg);
+        cfg.dwFlags = 0;
+        cfg.pszWindowTitle = L"\x9519\x8BEF\x63D0\x793A";          // error
+        cfg.pszMainIcon = TD_WARNING_ICON;
+        cfg.pszMainInstruction = L"\x5199\x5165\x6587\x4EF6\x5931\x8D25"; // write file failed
+        cfg.pszContent = content.c_str();
+        cfg.cButtons = ARRAYSIZE(buttons);
+        cfg.pButtons = buttons;
+        cfg.nDefaultButton = IDRETRY;
+        cfg.pszVerificationText = L"\x90FD\x6309\x6B64\x5904\x7406"; // apply to all
+
+        int pressed = 0;
+        BOOL checked = FALSE;
+        if (SUCCEEDED(pTaskDialog(&cfg, &pressed, nullptr, &checked))) {
+            *button = pressed;
+            *applyToAll = (checked != FALSE);
+            shown = true;
+        }
+    }
+
+    if (comctl) FreeLibrary(comctl);
+    if (activated) DeactivateActCtx(0, cookie);
+    if (hCtx != INVALID_HANDLE_VALUE) ReleaseActCtx(hCtx);
+    return shown;
+}
+
+// Prompts the user about a file-write failure, offering retry/ignore/abort plus an
+// "apply to all" checkbox. Honors a previously remembered "ignore all" decision so
+// repeated failures don't keep interrupting the install. Returns IDRETRY / IDIGNORE
+// / IDABORT.
+int PromptWriteFailure(const std::wstring& filePath)
+{
+    std::lock_guard<std::mutex> lock(g_writeFailureMutex);
+    if (g_writeFailureChoice != 0) {
+        return g_writeFailureChoice;
+    }
+
+    int button = 0;
+    bool applyToAll = false;
+    if (ShowWriteFailureTaskDialog(filePath, &button, &applyToAll)) {
+        // Only "ignore" is safe to apply to all; remembering retry would loop forever
+        // on a genuinely unwritable file, and abort terminates the installer anyway.
+        if (applyToAll && button == IDIGNORE) {
+            g_writeFailureChoice = IDIGNORE;
+        }
+        return button;
+    }
+
+    // Fallback when TaskDialog is unavailable: classic prompt without "apply to all".
+    const std::wstring msg = L"\x5199\x5165\x6587\x4EF6:<" + filePath + L">\x5931\x8D25"; // write file:<path> failed
+    return MessageBoxW(NULL, msg.c_str(), L"\x9519\x8BEF\x63D0\x793A", MB_ABORTRETRYIGNORE);
 }
 
 }
@@ -391,17 +493,24 @@ int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, const std::wstring &mUn
                 DWORD dLastError = OutFile_OpenW(&outFile, longFullPath.c_str());
                 if (dLastError) {
 					if (dLastError == 5) {
-						// Some tools keep files locked; try a shell delete before retrying.
-                        std::wstring delCommand = L"cmd /c del /F /Q \"" + fullPath + L"\"";
-                        ExecuteProcess(delCommand.c_str(), true, -1);
-						dLastError = OutFile_OpenW(&outFile, longFullPath.c_str());
+						// An existing read-only file blocks the overwrite; clear the
+						// attribute and retry before falling back to a shell delete.
+						DWORD attrs = GetFileAttributesW(longFullPath.c_str());
+						if (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_READONLY)) {
+							SetFileAttributesW(longFullPath.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
+							dLastError = OutFile_OpenW(&outFile, longFullPath.c_str());
+						}
+						if (dLastError) {
+							// Some tools keep files locked; try a shell delete before retrying.
+							std::wstring delCommand = L"cmd /c del /F /Q \"" + fullPath + L"\"";
+							ExecuteProcess(delCommand.c_str(), true, -1);
+							dLastError = OutFile_OpenW(&outFile, longFullPath.c_str());
+						}
 					}
 					if (dLastError) {
                         res = SZ_ERROR_FAIL;
                         APPLOG(Log::LOG_ERROR)("\n---unzip_7z_file: OutFile_OpenW error, filename : %s ,last error:%lu---\n", WtoS(fullPath).c_str(), dLastError);
-                        CDuiString msg;
-                        msg.Format(_T("\x5199\x5165\x6587\x4EF6:<%s>\x5931\x8D25"), fullPath.c_str());
-                        int ret = MessageBox(NULL, msg, _T("\x9519\x8BEF\x63D0\x793A"), MB_ABORTRETRYIGNORE);
+                        int ret = PromptWriteFailure(fullPath);
                         if (ret == IDRETRY) {
                             continue;
                         }
