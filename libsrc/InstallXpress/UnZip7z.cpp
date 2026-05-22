@@ -202,8 +202,10 @@ typedef HRESULT(WINAPI* TaskDialogIndirect_t)(const TASKDIALOGCONFIG*, int*, int
 bool ShowWriteFailureTaskDialog(const std::wstring& filePath, int* button, bool* applyToAll)
 {
     HMODULE shell32 = GetModuleHandleW(L"shell32.dll");
+    bool shell32Loaded = false;
     if (shell32 == NULL) {
         shell32 = LoadLibraryW(L"shell32.dll");
+        shell32Loaded = (shell32 != NULL);
     }
     if (shell32 == NULL) {
         return false;
@@ -257,6 +259,7 @@ bool ShowWriteFailureTaskDialog(const std::wstring& filePath, int* button, bool*
     if (comctl) FreeLibrary(comctl);
     if (activated) DeactivateActCtx(0, cookie);
     if (hCtx != INVALID_HANDLE_VALUE) ReleaseActCtx(hCtx);
+    if (shell32Loaded) FreeLibrary(shell32);
     return shown;
 }
 
@@ -492,7 +495,7 @@ int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, const std::wstring &mUn
 				res = 0;
                 DWORD dLastError = OutFile_OpenW(&outFile, longFullPath.c_str());
                 if (dLastError) {
-					if (dLastError == 5) {
+					if (dLastError == ERROR_ACCESS_DENIED) {
 						// An existing read-only file blocks the overwrite; clear the
 						// attribute and retry before falling back to a shell delete.
 						DWORD attrs = GetFileAttributesW(longFullPath.c_str());
