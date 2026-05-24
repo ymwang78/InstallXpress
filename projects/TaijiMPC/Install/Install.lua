@@ -1,4 +1,4 @@
-﻿-- HRootKey, CSIDL, RunBatchFile, ErrorHint are provided by the framework base library.
+-- HRootKey, CSIDL, RunBatchFile, ErrorHint are provided by the framework base library.
 
 -- Resource ID constants (mirrors resource.h)
 local RES = {
