@@ -48,8 +48,8 @@ IDB_PNG2                PNG                     "res\\setup.png"
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 5,2,41,6
- PRODUCTVERSION 5,2,41,6
+ FILEVERSION 5,3,42,0
+ PRODUCTVERSION 5,3,42,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -65,13 +65,13 @@ BEGIN
         BLOCK "080404b0"
         BEGIN
             VALUE "CompanyName", "TaijiMPC"
-            VALUE "FileDescription", "TaijiMPC–∂‘ÿ≥Ã–Ú"
-            VALUE "FileVersion", "5.2.41.6"
+            VALUE "FileDescription", "Tai-Ji MPC UnInstall"
+            VALUE "FileVersion", "v5.3.42.0"
             VALUE "InternalName", "UnInstal.exe"
             VALUE "LegalCopyright", "Copyright (C) 2017"
             VALUE "OriginalFilename", "UnInstal.exe"
             VALUE "ProductName", "TaijiMPC"
-            VALUE "ProductVersion", "5.2.41.6"
+            VALUE "ProductVersion", "v5.3.42.0"
         END
     END
     BLOCK "VarFileInfo"
