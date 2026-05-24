@@ -152,3 +152,6 @@ bin/x64/debug/
 bin/x64/release/
 bin/Win32/debug/
 bin/Win32/release/
+
+# Claude local settings (machine-specific, not shared)
+.claude/settings.local.json
