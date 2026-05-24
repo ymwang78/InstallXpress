@@ -72,8 +72,8 @@ IDR_LUA_SCRIPT          LUA_SCRIPT              "Install.lua"
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 5,2,41,6
- PRODUCTVERSION 5,2,41,6
+ FILEVERSION 5,3,42,0
+ PRODUCTVERSION 5,3,42,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -90,12 +90,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Tai-Ji Control"
             VALUE "FileDescription", "Tai-Ji MPC"
-            VALUE "FileVersion", "5.2.41.6"
+            VALUE "FileVersion", "5.3.42.0"
             VALUE "InternalName", "Install.exe"
             VALUE "LegalCopyright", "Copyright (C) 2026"
             VALUE "OriginalFilename", "Install.exe"
             VALUE "ProductName", "Tai-Ji MPC"
-            VALUE "ProductVersion", "5.2.41.6"
+            VALUE "ProductVersion", "5.3.42.0"
         END
     END
     BLOCK "VarFileInfo"
@@ -155,7 +155,7 @@ IDI_INSTALL             ICON                    "Install.ico"
 //
 
 IDR_INSTALLSOFT1        INSTALLSOFT             "res\\Win32.7z"
-IDR_INSTALLSOFT2        INSTALLSOFT             "res\\WinPy312.7z"
+IDR_INSTALLSOFT2        INSTALLSOFT             "res\\WinPy313.7z"
 IDR_INSTALLSOFT3        INSTALLSOFT             "res\\TaiJiDataSvc.7z"
 
 /////////////////////////////////////////////////////////////////////////////

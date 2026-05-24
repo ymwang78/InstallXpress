@@ -1,10 +1,10 @@
--- HRootKey, CSIDL, RunBatchFile, ErrorHint are provided by the framework base library.
+﻿-- HRootKey, CSIDL, RunBatchFile, ErrorHint are provided by the framework base library.
 
 -- Resource ID constants (mirrors resource.h)
 local RES = {
     LICENSE  = 133,  -- IDR_REGCONTENT1
     SOFT1    = 134,  -- IDR_INSTALLSOFT1 (Win32.7z)
-    SOFT2    = 139,  -- IDR_INSTALLSOFT2 (WinPy312.7z)
+    SOFT2    = 139,  -- IDR_INSTALLSOFT2 (WinPy313.7z)
     SOFT3    = 140,  -- IDR_INSTALLSOFT3 (TaiJiDataSvc.7z)
     BACKGROUND = 138, -- IDB_RES_BACKGROUND
 }
@@ -118,9 +118,9 @@ end
 local _image_index = 0
 local _lastPercent = 0   -- prevents progress bar going backwards during parallel extraction
 
--- Progress ranges based on actual 7z file sizes (Win32:163MB, WinPy312:1121MB, TaiJiDataSvc:29MB, total ~1312MB)
+-- Progress ranges based on actual 7z file sizes (Win32:163MB, WinPy313:1121MB, TaiJiDataSvc:29MB, total ~1312MB)
 -- SOFT1 (Win32.7z,  163MB): 5%~16%  (11 points, ~12%)
--- SOFT2 (WinPy312.7z, 1121MB): 16%~90% (74 points, ~85%)
+-- SOFT2 (WinPy313.7z, 1121MB): 16%~90% (74 points, ~85%)
 -- SOFT3 (TaiJiDataSvc.7z, 29MB): 90%~92% (2 points, ~3%)
 
 function OnUnzipProgress(nNotifyID, nTotalFileNum, nCurFileIndex, nTotalSize, nCurrentSize)
@@ -290,13 +290,13 @@ function PostSetup()
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl", "InstallPath", _dirCompany)
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\TaiJiMPC5", "APPPath", _dirExeFullPath)
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\TaiJiMPC5", "Version", _VERSION)
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\PythonEnv", "InstallPath", _dirCompany .. "\\WinPy312\\python")
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\PythonEnv", "InstallPath", _dirCompany .. "\\WinPy313\\python")
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\PythonEnv", "Version", "3.12")
 
 	installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl", "InstallPath", _dirCompany)
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\TaiJiMPC5", "APPPath", _dirExeFullPath)
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\TaiJiMPC5", "Version", _VERSION)
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\PythonEnv", "InstallPath", _dirCompany .. "\\WinPy312\\python")
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\PythonEnv", "InstallPath", _dirCompany .. "\\WinPy313\\python")
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\PythonEnv", "Version", "3.12")
 
     local desktopDir = installx.FilePathGetSpecialLocation(CSIDL.COMMON_DESKTOPDIRECTORY)
@@ -345,17 +345,17 @@ function _FinishInstall()
 
     local setPyEnv = installx.DuiOptionSelect("pyenvbtn")
     if (setPyEnv) then
-        local issucess, errdesc = installx.SysPathAdd(_dirCompany .. "\\WinPy312\\python")
+        local issucess, errdesc = installx.SysPathAdd(_dirCompany .. "\\WinPy313\\python")
         if not issucess then
             installx.LogPrint(errdesc)
         end
 
-        issucess, errdesc = installx.SysPathAdd(_dirCompany .. "\\WinPy312\\python\\Scripts")
+        issucess, errdesc = installx.SysPathAdd(_dirCompany .. "\\WinPy313\\python\\Scripts")
         if not issucess then
             installx.LogPrint(errdesc)
         end
 
-        issucess, errdesc = installx.SysEnvSet("PYTHONHOME", _dirCompany .. "\\WinPy312\\python")
+        issucess, errdesc = installx.SysEnvSet("PYTHONHOME", _dirCompany .. "\\WinPy313\\python")
         if not issucess then
             installx.LogPrint(errdesc)
         end
