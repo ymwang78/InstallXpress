@@ -1,4 +1,4 @@
-// Microsoft Visual C++ generated resource script.
+﻿// Microsoft Visual C++ generated resource script.
 //
 #include "resource.h"
 
@@ -90,14 +90,14 @@ BEGIN
     BEGIN
         BLOCK "080404b0"
         BEGIN
-            VALUE "CompanyName", "Tai-Ji Control"
-            VALUE "FileDescription", "Tai-Ji MPC"
-            VALUE "FileVersion", "5.3.42.1"
+            VALUE "CompanyName", "ZJU"
+            VALUE "FileDescription", "RTO"
+            VALUE "FileVersion", "1.0.0.0"
             VALUE "InternalName", "Install.exe"
             VALUE "LegalCopyright", "Copyright (C) 2026"
             VALUE "OriginalFilename", "Install.exe"
-            VALUE "ProductName", "Tai-Ji MPC"
-            VALUE "ProductVersion", "5.3.42.1"
+            VALUE "ProductName", "RTO"
+            VALUE "ProductVersion", "1.0.0.0"
         END
     END
     BLOCK "VarFileInfo"
@@ -157,9 +157,9 @@ IDI_INSTALL             ICON                    "Install.ico"
 // INSTALLSOFT
 //
 
-IDR_INSTALLSOFT1        INSTALLSOFT             "res\\Win32.7z"
-IDR_INSTALLSOFT2        INSTALLSOFT             "res\\WinPy313.7z"
-IDR_INSTALLSOFT3        INSTALLSOFT             "res\\TaiJiDataSvc.7z"
+IDR_INSTALLSOFT1        INSTALLSOFT             "res\\Rto.7z"
+IDR_INSTALLSOFT2        INSTALLSOFT             "res\\WinPy312.7z"
+IDR_INSTALLSOFT3        INSTALLSOFT             "res\\data.7z"
 
 /////////////////////////////////////////////////////////////////////////////
 //
