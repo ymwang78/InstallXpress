@@ -3,6 +3,7 @@
 -- Resource ID constants (mirrors resource.h)
 local RES = {
     LICENSE  = 133,  -- IDR_REGCONTENT1
+    LICENSE_EN = 143, -- IDR_REGCONTENT_EN
     SOFT1    = 134,  -- IDR_INSTALLSOFT1 (Rto.7z)
     SOFT2    = 139,  -- IDR_INSTALLSOFT2 (WinPy312.7z)
     SOFT3    = 140,  -- IDR_INSTALLSOFT3 (data.7z)
@@ -21,26 +22,42 @@ local _resourceProgress = {}
 local _lastLoggedPercent = -1
 
 local _strResourceCN = {
-	SETUP = "浙大RTO安装程序",
+	SETUP = "RTO安装程序",
 	CHOOSE_INSTALL_PATH = "选择安装路径",
 	LICENSE = "安装许可协议",
 	SPACE_NOT_ENOUGH = "系统空间不足",
 	SPACE_HINT = "系统空间不足，需要5G以上空间，请另外选择安装位置",
 	MKDIR_FAILED = "创建目录失败: ",
 	LOADING = "正在加载",
+	LICENSE_RES = RES.LICENSE,
 }
 
 local _strResourceEN = {
-	SETUP = "Setup",
+	SETUP = "RTO Installation Program",
 	CHOOSE_INSTALL_PATH = "Choose Install Path",
 	LICENSE = "License Agreement",
 	SPACE_NOT_ENOUGH = "System space is not enough",
 	SPACE_HINT = "System space is not enough, need more than 500M, please choose another install path",
 	MKDIR_FAILED = "Make dir failed: ",
 	LOADING = "Loading",
+	LICENSE_RES = RES.LICENSE_EN,
 }
 
 local _strResource = _strResourceCN
+
+function SelectStringResource()
+	local progressText = installx.DuiText("installprogress")
+	local titleText = installx.DuiText("titletext")
+	local licenseText = installx.DuiText("lookprotbtn")
+
+	if progressText == "Loading" or titleText == _strResourceEN.SETUP or licenseText == _strResourceEN.LICENSE then
+		_strResource = _strResourceEN
+		installx.LogPrint("Language resource: en")
+	else
+		_strResource = _strResourceCN
+		installx.LogPrint("Language resource: zh-CN")
+	end
+end
 
 function ResetInstallPath(installPath)
     _dirCompany = installPath
@@ -49,19 +66,13 @@ function ResetInstallPath(installPath)
 end
 
 function OnInitialize()
+	SelectStringResource()
     _dirCompany = installx.RegGetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\ZJU", "InstallPath")
     if (_dirCompany == nil or _dirCompany == "") then
         _dirCompany = "C:\\ZJU"
     end
     ResetInstallPath(_dirCompany)
     installx.DuiText("pathedit", _dirCompany)
-	local acp = installx.SysACP()
-	if acp == 936 then
-		_strResource = _strResourceCN
-	else
-		_strResource = _strResourceEN
-	end
-	installx.LogPrint("ACP: ", acp)
 end
 
 function OnButtonClick(btnName)
@@ -83,8 +94,8 @@ function OnButtonClick(btnName)
             installx.DuiTabSelect("installlayout", 0)
             installx.DuiVisible("custombtn", true)
             installx.DuiText("titletext", _strResource.SETUP)
-            installx.DuiTextColor("titletext", 0xFFFFFFFF)
-            installx.DuiSetBkImage("mainlayout", "res='" .. RES.BACKGROUND .. "' restype='png' source='0,0,600,221' corner='300,208,5,5'")
+            installx.DuiTextColor("titletext", 0xFF3E8EC9)
+            installx.DuiSetBkImage("mainlayout", "res='" .. RES.BACKGROUND .. "' restype='png' source='0,0,600,222' corner='300,221,5,0'")
         else
             installx.DuiMessage(0x10, 0, 0) -- WM_CLOSE
         end
@@ -96,7 +107,7 @@ function OnButtonClick(btnName)
         installx.DuiVisible("custombtn", false)
         installx.DuiText("titletext", _strResource.LICENSE)
         installx.DuiTextColor("titletext", 0xFF5DA5FF)
-        installx.DuiText("portcontent", RES.LICENSE)
+        installx.DuiText("portcontent", _strResource.LICENSE_RES)
         installx.DuiSetBkImage("mainlayout", "res='" .. RES.BACKGROUND .. "' restype='png' source='20,210,80,216'")
     elseif (btnName == "starinstallbtn") then
         StartSetup()
@@ -132,13 +143,13 @@ function UpdateInstallProgress(percent)
 	local bgRes = "res='" .. RES.BACKGROUND .. "' restype='png'"
 	if _image_index < 3 and percent > 80 then
 		_image_index = 3
-		installx.DuiSetBkImage("mainlayout", bgRes .. " source='0,666,600,886' corner='300,208,5,5'")
+		installx.DuiSetBkImage("mainlayout", bgRes .. " source='0,666,600,886' corner='300,219,5,0'")
 	elseif _image_index < 2 and percent > 50 then
 		_image_index = 2
-		installx.DuiSetBkImage("mainlayout", bgRes .. " source='0,444,600,664' corner='300,208,5,5'")
+		installx.DuiSetBkImage("mainlayout", bgRes .. " source='0,444,600,666' corner='300,221,5,0'")
 	elseif _image_index < 1 and percent > 15 then
 		_image_index = 1
-		installx.DuiSetBkImage("mainlayout", bgRes .. " source='0,222,600,442' corner='300,208,5,5'")
+		installx.DuiSetBkImage("mainlayout", bgRes .. " source='0,222,600,444' corner='300,221,5,0'")
 	end
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
 

@@ -34,6 +34,7 @@ static CMainFrame* _sglMainFrame = 0;
 CMainFrame::CMainFrame(InstallXpress_Init_t* init_t)
     : m_pInit(init_t)
     , m_bcloseInstall(false)
+    , m_bWindowInitialized(false)
     , m_pCloseBtn(NULL)
     , m_hThread(NULL)
     , m_pProgress(NULL)
@@ -191,8 +192,14 @@ LRESULT CMainFrame::HandleCustomMessage(UINT uMsg, WPARAM wParam, LPARAM lParam,
         else {
             m_luaPtr->OnUnzipProgress(nNotifyID, -1, -1, -1, -1);
             m_luaPtr->PostSetup();
-            // Start finish animation regardless of whether extraction was sequential or parallel
-            SetTimer(this->GetHWND(), WMPROGRESSFINISH_TIMER, PORGRESSHIDESEPLEN, 0);
+            if (m_pInit->bSilentInstall) {
+                APPLOG(Log::LOG_TRACE)("Silent install completed; closing installer\n");
+                PostMessage(WM_CLOSE, 0, 0);
+            }
+            else {
+                // Start finish animation regardless of whether extraction was sequential or parallel
+                SetTimer(this->GetHWND(), WMPROGRESSFINISH_TIMER, PORGRESSHIDESEPLEN, 0);
+            }
         }
 		return 0L;
 	}
@@ -212,6 +219,10 @@ char* remove_bom(const char* str) {
 
 void CMainFrame::WindowInitialized()
 {
+    if (m_bWindowInitialized)
+        return;
+    m_bWindowInitialized = true;
+
 	SetIcon(m_pInit->nResourceIDIcon);
 
     m_luaPtr = new InstallLua(&m_PaintManager, UnicodeToUtf8(DirUtility().Version()));
@@ -228,6 +239,12 @@ void CMainFrame::WindowInitialized()
 	m_pTipLabel = static_cast<CLabelUI*>(m_PaintManager.FindControl(_T("errortiplab")));
 	m_pCloseBtn = static_cast<CButtonUI*>(m_PaintManager.FindControl(_T("closebtn")));
 	m_pProgress = static_cast<CProgressUI*>(m_PaintManager.FindControl(_T("installprogress")));
+
+    if (m_pInit->bSilentInstall) {
+        APPLOG(Log::LOG_TRACE)("Silent install requested by /s\n");
+        m_luaPtr->OnButtonClick("starinstallbtn");
+        InstallSetup();
+    }
 }
 
 void CMainFrame::_OnClickBtn(TNotifyUI &msg)

@@ -1,74 +1,12 @@
-# Python
-__pycache__/
-*.py[cod]
-*.class
-*.so
-.Python
-build/
-dist/
-*.egg-info/
-.installed.cfg
-*.egg
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-.nox/
-.hypothesis/
+# 自己的特殊约定
+bin/
+obj/
+*.local
+.*
+local.*
+/docs
 
-# Virtual Environment
-venv/
-ENV/
-env/
-.env/
-.venv/
-env.bak/
-venv.bak/
-.python-version
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-*.sublime-workspace
-*.sublime-project
-.project
-.pydevproject
-.settings/
-*.code-workspace
-.history/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Database
-*.sqlite3
-*.db
-*.sqlite
-
-# OS
-.DS_Store
-Thumbs.db
-desktop.ini
-.BIN/
-*.lnk
-
-# Node
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# C/C++
+# C++ 构建文件
 *.o
 *.obj
 *.exe
@@ -88,70 +26,117 @@ yarn-error.log*
 *.asm
 *.ASM
 *.class
+
+# 压缩包
 *.jar
 *.war
 *.ear
-*.pdb
-*.bin
-*.tlog
-*.ilk
-*.pdb
-*.idb
-*.ipdb
-*.iobj
-*.cod
+*.zip
+*.tar.gz
+*.rar
 *.7z
-*.aps
-Debug/
-Release/
+*.cpp.bak
+*.h.bak
 
-# CMake
-CMakeFiles/
+# CMake 构建目录
+build/
+cmake-build-*/
 CMakeCache.txt
+CMakeFiles/
 cmake_install.cmake
 Makefile
 *.cmake
 !CMakeLists.txt
-!.cmake
 
-# Visual Studio
-.vs/
-*.suo
-*.user
-*.userosscache
-*.sln.docstates
-*.userprefs
-*.VC.db
-*.VC.opendb
-*.VC.VC.opendb
-
-# Qt
-*.pro.user
-*.pro.user.*
-*.qmake.stash
+# Qt 特定文件
 *.moc
 moc_*.cpp
+moc_*.h
 qrc_*.cpp
 ui_*.h
-.qmake.cache
-.qmake.stash
-*.prl
 *.qm
-*.ts
-*.tsx
+*.qmlc
+*.jsc
 
-# Version Control
-*.scc
-*.vspscc
-*.sconsign.dblite
-*.old
+# Qt Creator
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+*.pro.user.*.autosave
 
-# My
+# IDE 文件
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+.project
+.pydevproject
+.settings/
+*.code-workspace
+.history/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# 编译器特定文件
+*.gch
+*.pch
+*.dSYM/
+*.suo
+*.user
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.VC.opendb
+
+# 调试文件
+*.pdb
+*.ilk
+*.exp
+*.map
+
+# 临时文件
+*.tmp
+*.temp
 *.log
-bin/x64/debug/
-bin/x64/release/
-bin/Win32/debug/
-bin/Win32/release/
+*.bak
+*.backup
 
-# Claude local settings (machine-specific, not shared)
-.claude/settings.local.json
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+test_results/
+coverage/
+*.gcov
+*.gcda
+*.gcno
+
+# 依赖管理
+vcpkg_installed/
+conan/
+conanfile.txt.lock
+
+# 文档生成
+docs/_build/
+docs/html/
+docs/latex/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

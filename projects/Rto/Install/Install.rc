@@ -123,7 +123,7 @@ LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
 // PNG
 //
 
-IDB_RES_PNG             PNG                     "res\\setupEn.png"
+IDB_RES_PNG_EN          PNG                     "res\\setupEn.png"
 IDB_RES_BACKGROUND      PNG                     "res\\background.png"
 IDB_LOGO_PNG            PNG                     "res\\loginlogo.png"
 
@@ -133,14 +133,14 @@ IDB_LOGO_PNG            PNG                     "res\\loginlogo.png"
 // REGCONTENT
 //
 
-IDR_REGCONTENT1         REGCONTENT              "res\\UserLicense.txt"
+IDR_REGCONTENT_EN       REGCONTENT              "res\\UserLicense.txt"
 
 /////////////////////////////////////////////////////////////////////////////
 //
 // XML
 //
 
-IDR_MAIN_XML            XML                     "res\\InstallDialog_en.xml"
+IDR_MAIN_XML_EN         XML                     "res\\InstallDialog_en.xml"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -235,4 +235,3 @@ END
 
 /////////////////////////////////////////////////////////////////////////////
 #endif    // not APSTUDIO_INVOKED
-

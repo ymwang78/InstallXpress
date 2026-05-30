@@ -45,6 +45,7 @@ extern "C" {
         LPCTSTR   szSkinXML;
         int       nResourceIDIcon;
         int       nResourceIDLua;
+        bool      bSilentInstall;
     };
 
     int InstallXpress_WinMain(InstallXpress_Init_t* init_t);

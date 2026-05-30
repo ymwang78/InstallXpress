@@ -50,6 +50,7 @@ public:
 private: 
     InstallXpress_Init_t* m_pInit;
 	bool m_bcloseInstall;
+	bool m_bWindowInitialized;
 	std::wstring m_strAppExePath;
 
 	CDirUtility  m_dirUtility;
@@ -62,4 +63,3 @@ private:
 
 	HANDLE m_hThread;
 };
-

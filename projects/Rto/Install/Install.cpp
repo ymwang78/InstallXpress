@@ -1,7 +1,4 @@
-﻿// ZhiduInstall.cpp : 定义应用程序的入口点。
-//
-
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "Install.h"
 #include <shlobj.h>
 #include "resource.h"
@@ -12,11 +9,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_ LPWSTR    lpCmdLine,
 	_In_ int       nCmdShow)
 {
-    TCHAR szSkinXML[16] = { 0 };
-    _stprintf_s(szSkinXML, sizeof(szSkinXML) / sizeof(TCHAR) - 1, _T("%d"), IDR_MAIN_XML);
+    LANGID uiLang = GetUserDefaultUILanguage();
+    if (PRIMARYLANGID(uiLang) == LANG_NEUTRAL) {
+        uiLang = GetSystemDefaultUILanguage();
+    }
+    const bool useChinese = (PRIMARYLANGID(uiLang) == LANG_CHINESE);
+    const int skinXmlId = useChinese ? IDR_MAIN_XML : IDR_MAIN_XML_EN;
 
-    LCID systemLCID = GetSystemDefaultLCID();
-    SetThreadLocale(systemLCID);
+    TCHAR szSkinXML[16] = { 0 };
+    _stprintf_s(szSkinXML, sizeof(szSkinXML) / sizeof(TCHAR) - 1, _T("%d"), skinXmlId);
 
     InstallXpress_Init_t init_t{
         hInstance,

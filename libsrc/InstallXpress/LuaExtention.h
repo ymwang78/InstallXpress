@@ -4,6 +4,7 @@ extern "C" {
 #include <lualib.h>
 #include <lauxlib.h>
 }
+#include <string>
 
 class  lua_base
 {
@@ -78,7 +79,8 @@ struct value_extractor<std::string>
 {
     static std::string get(lua_State* vm)
     {
-        std::string val = lua_tostring(vm, -1);
+        const char* str = lua_tostring(vm, -1);
+        std::string val = str ? str : "";
         lua_pop(vm, 1);
         return val;
     }
@@ -100,6 +102,7 @@ public:
 protected:
     lua_State* m_vm;
     int m_func;
+    std::string m_funcName;
 
     static void push_value(lua_State* vm, int n);
 

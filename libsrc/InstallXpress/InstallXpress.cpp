@@ -6,6 +6,7 @@
 #include <shellapi.h>
 #include <TlHelp32.h>
 #include <vector>
+#include <string>
 #include "MainFrame.h"
 #include "Utility/log.h"
 #include "InstallXpress.h"
@@ -31,6 +32,56 @@ BOOL IsRunAsAdmin()
     return fIsRunAsAdmin;
 }
 
+static bool IsSilentInstallCommandLine()
+{
+    int argc = 0;
+    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    if (!argv)
+        return false;
+
+    bool silent = false;
+    for (int i = 1; i < argc; ++i) {
+        if (_wcsicmp(argv[i], L"/s") == 0) {
+            silent = true;
+            break;
+        }
+    }
+    LocalFree(argv);
+    return silent;
+}
+
+static std::wstring QuoteCommandLineArg(const std::wstring& arg)
+{
+    if (arg.find_first_of(L" \t\"") == std::wstring::npos)
+        return arg;
+
+    std::wstring quoted = L"\"";
+    for (wchar_t ch : arg) {
+        if (ch == L'"')
+            quoted += L'\\';
+        quoted += ch;
+    }
+    quoted += L"\"";
+    return quoted;
+}
+
+static std::wstring GetCurrentProcessParameters()
+{
+    int argc = 0;
+    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    if (!argv)
+        return L"";
+
+    std::wstring params;
+    for (int i = 1; i < argc; ++i) {
+        if (!params.empty())
+            params += L" ";
+        params += QuoteCommandLineArg(argv[i]);
+    }
+    LocalFree(argv);
+    return params;
+}
+
 extern "C"
 BOOL TryElevate()
 {
@@ -45,6 +96,8 @@ BOOL TryElevate()
     SHELLEXECUTEINFO sei = { sizeof(sei) };
     sei.lpVerb = L"runas";
     sei.lpFile = path;
+    std::wstring params = GetCurrentProcessParameters();
+    sei.lpParameters = params.empty() ? NULL : params.c_str();
     sei.hwnd = NULL;
     sei.nShow = SW_NORMAL;
 
@@ -56,6 +109,7 @@ BOOL TryElevate()
         return FALSE;
     }
     else {
+        ExitProcess(0);
         return TRUE;
     }
 }
@@ -269,6 +323,7 @@ int InstallXpress_WinMain(InstallXpress_Init_t* init_t)
     CPaintManagerUI::SetResourcePath(CPaintManagerUI::GetInstancePath() + _T(".."));
 
     CDuiString strCmdLine(init_t->lpCmdLine);
+    init_t->bSilentInstall = IsSilentInstallCommandLine();
 
     bool bUpdate = false;
     if (strCmdLine.Find(_T("/D=")) >= 0)
@@ -280,7 +335,12 @@ int InstallXpress_WinMain(InstallXpress_Init_t* init_t)
 
     if (pMainFrame) {
         pMainFrame->Create(NULL, init_t->szTitle, UI_CLASSSTYLE_DIALOG, WS_EX_STATICEDGE | WS_EX_APPWINDOW, 0, 0, 0, 0);
-        pMainFrame->ShowWindow();
+        if (init_t->bSilentInstall) {
+            pMainFrame->WindowInitialized();
+        }
+        else {
+            pMainFrame->ShowWindow();
+        }
         CPaintManagerUI::MessageLoop();
     }
 

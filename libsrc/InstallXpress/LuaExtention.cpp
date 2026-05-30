@@ -8,6 +8,7 @@
 #include <sstream>
 #include <iostream>
 #include <string>
+#include <filesystem>
 #include <sys/stat.h>
 #include <sys/types.h>
 #ifdef _WIN32
@@ -59,34 +60,17 @@ inline int portable_mkdir(const TCHAR* path) {
 }
 
 bool mkdir_p(const std::wstring& path) {
-    size_t pos = 0;
-    std::wstring currentPath;
-    std::wstring delimiter = L"/";
-
-#ifdef _WIN32
-    delimiter = L"\\";
-#endif
-
-    // 去除路径末尾的分隔符
-    std::wstring normalizedPath = path;
-    if (normalizedPath.back() == delimiter.back()) {
-        normalizedPath.pop_back();
-    }
-
-    while ((pos = normalizedPath.find(delimiter, pos)) != std::string::npos) {
-        currentPath = normalizedPath.substr(0, pos++);
-        if (currentPath.empty()) continue; // 如果是绝对路径，第一个会是空的
-
-        if (portable_mkdir(currentPath.c_str()) && errno != EEXIST) {
-            return false;
-        }
-    }
-
-    if (portable_mkdir(normalizedPath.c_str()) && errno != EEXIST) {
+    if (path.empty()) {
         return false;
     }
 
-    return true;
+    std::error_code ec;
+    if (std::filesystem::is_directory(path, ec)) {
+        return true;
+    }
+
+    ec.clear();
+    return std::filesystem::create_directories(path, ec) && !ec;
 }
 
 static INT CALLBACK BrowseCallbackProc(HWND hwnd, UINT uMsg, LPARAM lp, LPARAM pData)
@@ -1316,12 +1300,63 @@ int luaopen_reg(lua_State* L)
 
 //////////////////////////////////////////////////////////////////////////
 
+static int l_MissingLuaFunction(lua_State* L)
+{
+    lua_pushnil(L);
+    return 1;
+}
+
+static int ExtractLuaErrorLine(const std::string& msg)
+{
+    size_t closeBracket = msg.find("]:");
+    if (closeBracket == std::string::npos)
+        return -1;
+
+    size_t lineStart = closeBracket + 2;
+    size_t lineEnd = msg.find(':', lineStart);
+    if (lineEnd == std::string::npos || lineEnd <= lineStart)
+        return -1;
+
+    try {
+        return std::stoi(msg.substr(lineStart, lineEnd - lineStart));
+    }
+    catch (...) {
+        return -1;
+    }
+}
+
+static void LogLuaSourceContext(const char* source, int errorLine)
+{
+    if (source == nullptr || errorLine <= 0)
+        return;
+
+    int currentLine = 1;
+    const char* lineBegin = source;
+    while (*lineBegin && currentLine < errorLine) {
+        if (*lineBegin == '\n')
+            ++currentLine;
+        ++lineBegin;
+    }
+    if (!*lineBegin)
+        return;
+
+    const char* lineEnd = lineBegin;
+    while (*lineEnd && *lineEnd != '\r' && *lineEnd != '\n')
+        ++lineEnd;
+
+    std::string line(lineBegin, lineEnd - lineBegin);
+    APPLOG(Log::LOG_ERROR)("[Lua] Error near source line %d: %s\n", errorLine, line.c_str());
+}
+
 lua_function_base::lua_function_base(lua_State* vm, const std::string& func)
-    : m_vm(vm), m_func(-1)
+    : m_vm(vm), m_func(-1), m_funcName(func)
 {
     lua_getglobal(m_vm, func.c_str());
     if (!lua_isfunction(m_vm, -1)) {
         lua_pop(m_vm, 1);
+        APPLOG(Log::LOG_ERROR)("[Lua] Function not found: %s\n", func.c_str());
+        lua_pushcfunction(m_vm, l_MissingLuaFunction);
+        m_func = luaL_ref(m_vm, LUA_REGISTRYINDEX);
     }
     else {
         m_func = luaL_ref(m_vm, LUA_REGISTRYINDEX);
@@ -1329,7 +1364,7 @@ lua_function_base::lua_function_base(lua_State* vm, const std::string& func)
 }
 
 lua_function_base::lua_function_base(const lua_function_base& func)
-    : m_vm(func.m_vm)
+    : m_vm(func.m_vm), m_funcName(func.m_funcName)
 {
     lua_rawgeti(m_vm, LUA_REGISTRYINDEX, func.m_func);
     m_func = luaL_ref(m_vm, LUA_REGISTRYINDEX);
@@ -1344,6 +1379,7 @@ lua_function_base& lua_function_base::operator=(const lua_function_base& func)
 {
     if (this != &func) {
         m_vm = func.m_vm;
+        m_funcName = func.m_funcName;
         lua_rawgeti(m_vm, LUA_REGISTRYINDEX, func.m_func);
         m_func = luaL_ref(m_vm, LUA_REGISTRYINDEX);
     }
@@ -1392,7 +1428,7 @@ void lua_function_base::call(int args, int results)
     if (status != 0) {
         const char* err = lua_tostring(m_vm, -1);
         if (err) {
-            APPLOG(Log::LOG_ERROR)("[Lua] %s\n", err);
+            APPLOG(Log::LOG_ERROR)("[Lua] Function %s failed: %s\n", m_funcName.c_str(), err);
             OutputDebugStringA(err);
             OutputDebugStringA("\n");
         }
@@ -1444,8 +1480,8 @@ int lua_base::load_string(const char* cstr)
         std::string msg = err ? err : "unknown error";
         lua_pop(lua_, 1);
         APPLOG(Log::LOG_ERROR)("[Lua] Script load error: %s\n", msg.c_str());
+        LogLuaSourceContext(cstr, ExtractLuaErrorLine(msg));
         OutputDebugStringA(("[Lua] " + msg + "\n").c_str());
-        MessageBoxA(NULL, msg.c_str(), "Lua Script Error", MB_OK | MB_ICONERROR);
         return -1;
     }
     return 0;

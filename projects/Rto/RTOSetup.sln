@@ -1,6 +1,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.7.34221.43
+# Visual Studio Version 18
+VisualStudioVersion = 18.6.11822.322 stable
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "libsrc", "libsrc", "{95AE09C0-B20D-4371-885D-6747F7761305}"
 EndProject
@@ -23,6 +23,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "InstallXpress", "..\..\libs
 		{BA53E298-DE6F-407C-A096-1553E76E4587} = {BA53E298-DE6F-407C-A096-1553E76E4587}
 		{E106ACD7-4E53-4AEE-942B-D0DD426DB34E} = {E106ACD7-4E53-4AEE-942B-D0DD426DB34E}
 	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnInstall", "UnInstall\UnInstall.vcxproj", "{153C8A51-8F4D-4A4B-9BF0-537B0D47BB6C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -72,6 +74,14 @@ Global
 		{A69BEBBA-BFC0-4DD4-9EEE-36922E830A3C}.Release|x64.Build.0 = Release|x64
 		{A69BEBBA-BFC0-4DD4-9EEE-36922E830A3C}.Release|x86.ActiveCfg = Release|Win32
 		{A69BEBBA-BFC0-4DD4-9EEE-36922E830A3C}.Release|x86.Build.0 = Release|Win32
+		{153C8A51-8F4D-4A4B-9BF0-537B0D47BB6C}.Debug|x64.ActiveCfg = Debug|x64
+		{153C8A51-8F4D-4A4B-9BF0-537B0D47BB6C}.Debug|x64.Build.0 = Debug|x64
+		{153C8A51-8F4D-4A4B-9BF0-537B0D47BB6C}.Debug|x86.ActiveCfg = Debug|Win32
+		{153C8A51-8F4D-4A4B-9BF0-537B0D47BB6C}.Debug|x86.Build.0 = Debug|Win32
+		{153C8A51-8F4D-4A4B-9BF0-537B0D47BB6C}.Release|x64.ActiveCfg = Release|x64
+		{153C8A51-8F4D-4A4B-9BF0-537B0D47BB6C}.Release|x64.Build.0 = Release|x64
+		{153C8A51-8F4D-4A4B-9BF0-537B0D47BB6C}.Release|x86.ActiveCfg = Release|Win32
+		{153C8A51-8F4D-4A4B-9BF0-537B0D47BB6C}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -82,6 +92,7 @@ Global
 		{0ED8B12D-8289-42DA-8C26-D618E8952C0C} = {95AE09C0-B20D-4371-885D-6747F7761305}
 		{828857BD-587D-46C8-8523-1C2BEED1C5AA} = {04049352-7FFA-46E7-A772-B7C205C860C1}
 		{A69BEBBA-BFC0-4DD4-9EEE-36922E830A3C} = {95AE09C0-B20D-4371-885D-6747F7761305}
+		{153C8A51-8F4D-4A4B-9BF0-537B0D47BB6C} = {04049352-7FFA-46E7-A772-B7C205C860C1}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {D8B55742-A6B2-4054-8379-B2AF597F55BD}
