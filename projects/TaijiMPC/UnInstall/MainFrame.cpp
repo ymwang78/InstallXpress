@@ -11,8 +11,6 @@
 #include <InstallXpress/LuaExtention.h>
 #include <Utility/ResourceHandler.h>
 
-#pragma comment(lib, "liblua.lib")
-
 #define  WMPROGRESS_TIMER WM_USER+1000
 #define  WMPROGRESSFINISH_TIMER WM_USER+1001
 #define  WM_INSTALLPROGRES_MSG WM_USER+2000

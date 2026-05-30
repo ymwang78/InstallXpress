@@ -1,4 +1,4 @@
-// stdafx.cpp : source file that includes just the standard includes
+﻿// stdafx.cpp : source file that includes just the standard includes
 // $safeprojectname$.pch will be the pre-compiled header
 // stdafx.obj will contain the pre-compiled type information
 
@@ -6,6 +6,8 @@
 
 #pragma comment(lib, "duilib.lib")
 #pragma comment(lib, "Utility.lib")
+#pragma comment(lib, "InstallXpress.lib")
+#pragma comment(lib, "lib7z.lib")
 #if SUPPORT_WEBP
 #pragma comment(lib, "libwebp.lib")
 #endif
