@@ -189,7 +189,8 @@
     <ResourceCompile Include="UnInstall.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="res\loginlogo.png" />
+    <Image Include="..\Install\res\background.png" />
+    <Image Include="..\Install\res\loginlogo.png" />
     <Image Include="res\setup.png" />
     <Image Include="UnInstall.ico" />
   </ItemGroup>

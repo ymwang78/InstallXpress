@@ -7,6 +7,7 @@ local RES = {
     SOFT1    = 134,  -- IDR_INSTALLSOFT1 (Rto.7z)
     SOFT2    = 139,  -- IDR_INSTALLSOFT2 (WinPy312.7z)
     SOFT3    = 140,  -- IDR_INSTALLSOFT3 (data.7z)
+    UNINSTALL_EXE = 144, -- IDR_UNINSTALL_EXE (compiled UnInstall.exe)
     BACKGROUND = 138, -- IDB_RES_BACKGROUND
 }
 
@@ -251,11 +252,18 @@ function StartSetup()
 
 	local resourceIDs = {RES.SOFT1, RES.SOFT2}
 	local skipPrefixes = nil
+	local unzipJobs = {
+		{res = RES.SOFT1, dir = _dirCompany},
+		{res = RES.SOFT2, dir = _dirCompany},
+	}
 	if _installData then
 		installx.LogPrint("Include Resource ID " .. RES.SOFT3 .. " (data.7z)...")
 		table.insert(resourceIDs, RES.SOFT3)
+		table.insert(unzipJobs, {res = RES.SOFT3, dir = _dirExeHomeDir})
 	else
 		skipPrefixes = {"data"}
+		unzipJobs[1].skipPrefixes = skipPrefixes
+		unzipJobs[2].skipPrefixes = skipPrefixes
 		installx.LogPrint("Skip data.7z, directory already exists: " .. _dirData)
 		installx.LogPrint("Skip data entries from bundled archives as well")
 	end
@@ -265,9 +273,9 @@ function StartSetup()
 		_resourceProgress[resourceID] = 0
 	end
 
-	installx.LogPrint("Unzip selected resources in one pass...")
+	installx.LogPrint("Unzip selected resources by configured targets...")
 	UpdateInstallProgress(5)
-	installx.FilePathUnzip(resourceIDs, _dirCompany, skipPrefixes)
+	installx.FilePathUnzip(unzipJobs)
 end
 
 function PostSetup()
@@ -287,6 +295,7 @@ function PostSetup()
 
 	UpdateInstallProgress(96)
 
+    installx.FilePathSaveResource(RES.UNINSTALL_EXE, "BIN", _dirCompany .. "\\Rto\\UnInstall.exe")
 
 	UpdateInstallProgress(97)
 

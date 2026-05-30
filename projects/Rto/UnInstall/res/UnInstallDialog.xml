@@ -5,7 +5,7 @@
 <Font name="微软雅黑" size="22"/>
 <Font name="微软雅黑" size="40" bold="true"/>
 <Font name="微软雅黑" size="16"/>
-	<VerticalLayout bkimage="res='131' restype='png' source='0,0,600,220' corner='300,208,300,5'">
+	<VerticalLayout bkimage="res='138' restype='png' source='0,0,600,222' corner='300,221,5,0'">
 		<HorizontalLayout height="40" inset="10,8,10,0">
 			<Label name="piupiulogo" bkimage="res='130' restype='png'" width="24" height="20"/>
 			<Label name="titletext" text="卸载程序" textcolor="#FFFFFFFF" font="1" height="20" textpadding="10,0,0,0"/>

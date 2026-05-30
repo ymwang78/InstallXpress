@@ -1,4 +1,4 @@
-// UnInstall.cpp : Defines the entry point for the application.
+ï»¿// UnInstall.cpp : Defines the entry point for the application.
 //
 
 #include "stdafx.h"
@@ -22,22 +22,16 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	CPaintManagerUI::SetInstance(hInstance);
 	CPaintManagerUI::SetResourcePath(CPaintManagerUI::GetInstancePath() + _T(".."));
 
-	CDuiString strCmdLine(lpCmdLine);
-
-	bool bUpdate = false;
-	if (strCmdLine.Find(_T("/D=")) >= 0)
-		bUpdate = true;
-
-	CMainFrame* pMainFrame = new CMainFrame();
+	CUninstallMainFrame* pMainFrame = new CUninstallMainFrame();
 	if (pMainFrame)
 	{
-		pMainFrame->Create(NULL, _T("°²×°³ÌÐò"), UI_CLASSSTYLE_DIALOG, WS_EX_STATICEDGE | WS_EX_APPWINDOW, 0, 0, 0, 0);
+		pMainFrame->Create(NULL, _T("æ³°æžMPCå¸è½½"), UI_CLASSSTYLE_DIALOG, WS_EX_STATICEDGE | WS_EX_APPWINDOW, 0, 0, 0, 0);
 		pMainFrame->ShowWindow();
 		CPaintManagerUI::MessageLoop();
 	}
 
 	::OleUninitialize();
 	::CoUninitialize();
-  
+
     return (int)0;
 }

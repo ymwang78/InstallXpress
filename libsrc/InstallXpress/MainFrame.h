@@ -6,6 +6,13 @@
 class InstallLua;
 struct InstallXpress_Init_t;
 
+struct InstallXpress_UnzipJob
+{
+	UINT resourceID = 0;
+	std::wstring unzipDir;
+	std::vector<std::wstring> skipPrefixes;
+};
+
 class CMainFrame final : public WindowImplBase
 {
     unsigned _UnzipFileAsyncThread(void* param);
@@ -36,9 +43,11 @@ public:
 	int  UnzipFileAsync(unsigned resourceId, const std::wstring& strUnzipDir, int nNotifyID);
 	int  UnzipFileAsync(const std::wstring& strZipFile, const std::wstring& strUnzipDir, int nNotifyID);
 	int  UnzipFileAsync(const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir, const std::vector<std::wstring>& skipPrefixes = {});
+	int  UnzipFileAsync(const std::vector<InstallXpress_UnzipJob>& jobs);
 	void InstallZip(UINT nResourceID, const std::wstring& strUnzipDir, int nNotifyID);
 	void InstallZip(const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir, const std::vector<std::wstring>& skipPrefixes = {});
 	void InstallZipParallel(const std::vector<ResourceHandler*>& resources, const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir, const std::vector<std::wstring>& skipPrefixes);
+	void InstallZipParallel(const std::vector<ResourceHandler*>& resources, const std::vector<InstallXpress_UnzipJob>& jobs);
 	void SplitStringW(const WCHAR *pSrc, WCHAR chMark, std::vector<std::wstring> &vecStrings, BOOL bOnce);
 	
 public:

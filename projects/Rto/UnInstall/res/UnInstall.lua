@@ -86,6 +86,10 @@ function PreSetup()
     -- The native host removes that directory after this scripted cleanup.
     deleteIfExists(dirCompany .. "\\WinPy312")
     deleteIfExists(dirCompany .. "\\Common")
+    deleteIfExists(dirCompany .. "\\HttpServer")
+    deleteIfExists(dirCompany .. "\\Script")
+    deleteIfExists(dirCompany .. "\\Solver")
+    deleteIfExists(dirCompany .. "\\UnitModel")
 end
 
 function PostSetup()

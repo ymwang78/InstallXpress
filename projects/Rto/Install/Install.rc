@@ -161,6 +161,8 @@ IDR_INSTALLSOFT1        INSTALLSOFT             "res\\Rto.7z"
 IDR_INSTALLSOFT2        INSTALLSOFT             "res\\WinPy312.7z"
 IDR_INSTALLSOFT3        INSTALLSOFT             "res\\data.7z"
 
+IDR_UNINSTALL_EXE       BIN                     "res\\UnInstall.exe"
+
 /////////////////////////////////////////////////////////////////////////////
 //
 // RT_MANIFEST

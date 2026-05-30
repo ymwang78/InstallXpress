@@ -54,7 +54,10 @@
     <Image Include="UnInstall.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="res\loginlogo.png">
+    <Image Include="..\Install\res\background.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\Install\res\loginlogo.png">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="res\setup.png">

@@ -22,6 +22,7 @@ public:
     int load_file(const char* fullpath);
 
     int load_string(const char* cstr);
+    int load_string(const char* cstr, size_t len);
 };
 
 

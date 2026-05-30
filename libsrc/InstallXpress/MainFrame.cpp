@@ -206,15 +206,13 @@ LRESULT CMainFrame::HandleCustomMessage(UINT uMsg, WPARAM wParam, LPARAM lParam,
 	return WindowImplBase::HandleCustomMessage(uMsg, wParam, lParam, bHandled);
 }
 
-char* remove_bom(const char* str) {
-    if (str == NULL) return NULL;
+std::string remove_bom(const char* str, size_t len) {
+    if (str == NULL) return std::string();
     const unsigned char* ustr = (const unsigned char*)str;
-    if (ustr[0] == 0xEF && ustr[1] == 0xBB && ustr[2] == 0xBF) {
-        return strdup(str + 3);
+    if (len >= 3 && ustr[0] == 0xEF && ustr[1] == 0xBB && ustr[2] == 0xBF) {
+        return std::string(str + 3, len - 3);
     }
-    else {
-        return strdup(str);
-    }
+    return std::string(str, len);
 }
 
 void CMainFrame::WindowInitialized()
@@ -229,7 +227,8 @@ void CMainFrame::WindowInitialized()
     ResourceHandler* luaScript = LoadResourceFile(m_pInit->nResourceIDLua, _T("LUA_SCRIPT"));
     const char* script = (const char*) luaScript->GetData();
     if (script) {
-        m_luaPtr->load_string(remove_bom(script));
+        std::string luaText = remove_bom(script, luaScript->GetSize());
+        m_luaPtr->load_string(luaText.data(), luaText.size());
     }
     else {
         APPLOG(Log::LOG_ERROR)("Load lua script failed");
@@ -328,13 +327,32 @@ int CMainFrame::UnzipFileAsync(const std::wstring& strZipFile, const std::wstrin
 
 int CMainFrame::UnzipFileAsync(const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir, const std::vector<std::wstring>& skipPrefixes)
 {
+    std::vector<InstallXpress_UnzipJob> jobs;
+    jobs.reserve(resourceIDs.size());
+    for (UINT id : resourceIDs) {
+        InstallXpress_UnzipJob job;
+        job.resourceID = id;
+        job.unzipDir = strUnzipDir;
+        job.skipPrefixes = skipPrefixes;
+        jobs.push_back(job);
+    }
+    return UnzipFileAsync(jobs);
+}
+
+int CMainFrame::UnzipFileAsync(const std::vector<InstallXpress_UnzipJob>& jobs)
+{
+    if (jobs.empty()) {
+        APPLOG(Log::LOG_ERROR)("UnzipFileAsync: empty unzip job list\n");
+        return -1;
+    }
+
     // Pre-load all resources on the main thread (thread-safe access to m_resHandlerMap)
     std::vector<ResourceHandler*> resources;
-    resources.reserve(resourceIDs.size());
-    for (UINT id : resourceIDs) {
-        ResourceHandler* r = LoadResourceFile(id, _T("INSTALLSOFT"));
+    resources.reserve(jobs.size());
+    for (const InstallXpress_UnzipJob& job : jobs) {
+        ResourceHandler* r = LoadResourceFile(job.resourceID, _T("INSTALLSOFT"));
         if (r == nullptr) {
-            APPLOG(Log::LOG_ERROR)("UnzipFileAsync: resource %u not found\n", id);
+            APPLOG(Log::LOG_ERROR)("UnzipFileAsync: resource %u not found\n", job.resourceID);
             return -1;
         }
         resources.push_back(r);
@@ -344,15 +362,13 @@ int CMainFrame::UnzipFileAsync(const std::vector<UINT>& resourceIDs, const std::
     struct CoordCtx {
         CMainFrame* frame;
         std::vector<ResourceHandler*> resources;
-        std::vector<UINT> resourceIDs;
-        std::wstring unzipDir;
-        std::vector<std::wstring> skipPrefixes;
+        std::vector<InstallXpress_UnzipJob> jobs;
     };
-    auto* coord = new CoordCtx{ this, resources, resourceIDs, strUnzipDir, skipPrefixes };
+    auto* coord = new CoordCtx{ this, resources, jobs };
 
     m_hThread = (HANDLE)_beginthreadex(NULL, 0, [](void* p) -> unsigned {
         auto* c = static_cast<CoordCtx*>(p);
-        c->frame->InstallZipParallel(c->resources, c->resourceIDs, c->unzipDir, c->skipPrefixes);
+        c->frame->InstallZipParallel(c->resources, c->jobs);
         delete c;
         return 0;
     }, coord, 0, NULL);
@@ -443,7 +459,24 @@ void CMainFrame::InstallZipParallel(
     const std::wstring& strUnzipDir,
     const std::vector<std::wstring>& skipPrefixes)
 {
+    std::vector<InstallXpress_UnzipJob> jobs;
+    jobs.reserve(resourceIDs.size());
+    for (UINT id : resourceIDs) {
+        InstallXpress_UnzipJob job;
+        job.resourceID = id;
+        job.unzipDir = strUnzipDir;
+        job.skipPrefixes = skipPrefixes;
+        jobs.push_back(job);
+    }
+    InstallZipParallel(resources, jobs);
+}
+
+void CMainFrame::InstallZipParallel(
+    const std::vector<ResourceHandler*>& resources,
+    const std::vector<InstallXpress_UnzipJob>& jobs)
+{
     if (resources.empty()) return;
+    if (resources.size() != jobs.size()) return;
 
     // WaitForMultipleObjects supports at most MAXIMUM_WAIT_OBJECTS (64) handles.
     // In practice installers use 2-3 packages; assert to catch misuse.
@@ -452,7 +485,7 @@ void CMainFrame::InstallZipParallel(
 
     // Always use the last resource ID from the original list as the completion notifyID
     // so Lua's OnUnzipProgress receives a deterministic value regardless of thread ordering.
-    const UINT completionNotifyID = resourceIDs.back();
+    const UINT completionNotifyID = jobs.back().resourceID;
 
     struct WorkerCtx {
         ResourceHandler* resource;
@@ -474,10 +507,10 @@ void CMainFrame::InstallZipParallel(
     for (int i = 0; i < (int)resources.size(); ++i) {
         auto* ctx = new WorkerCtx{
             resources[i],
-            resourceIDs[i],
+            jobs[i].resourceID,
             completionNotifyID,
-            strUnzipDir,
-            skipPrefixes,
+            jobs[i].unzipDir,
+            jobs[i].skipPrefixes,
             this->GetHWND(),
             remaining,
             anyFailed
@@ -510,7 +543,7 @@ void CMainFrame::InstallZipParallel(
 
         if (h == NULL) {
             // Thread creation failed: decrement counter immediately so completion is not blocked
-            APPLOG(Log::LOG_ERROR)("InstallZipParallel: _beginthreadex failed for resource %u\n", resourceIDs[i]);
+            APPLOG(Log::LOG_ERROR)("InstallZipParallel: _beginthreadex failed for resource %u\n", jobs[i].resourceID);
             anyFailed->store(true);
             delete ctx;
             if (--(*(remaining)) == 0) {

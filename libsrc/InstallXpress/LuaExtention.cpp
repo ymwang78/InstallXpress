@@ -620,6 +620,63 @@ static int l_FilePathGetSpecialLocation(lua_State * L)
 }
 
 extern "C"
+static int l_FilePathSaveResource(lua_State* L)
+{
+    lua_Integer resourceID = luaL_checkinteger(L, 1);
+    const char* resourceType = luaL_checkstring(L, 2);
+    const char* destPath = luaL_checkstring(L, 3);
+
+    APPLOG(LOG_TRACE)("%s: %lld, %s -> %s\n", "FilePathSaveResource", resourceID, resourceType, destPath);
+
+    if (resourceID <= 0 || resourceType == nullptr || destPath == nullptr || _pPaintManager == 0) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+
+    HRSRC hResource = ::FindResource(
+        _pPaintManager->GetResourceDll(),
+        MAKEINTRESOURCE((int)resourceID),
+        Utf82Unicode(resourceType).c_str());
+    if (hResource == NULL) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+
+    HGLOBAL hGlobal = ::LoadResource(_pPaintManager->GetResourceDll(), hResource);
+    if (hGlobal == NULL) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+
+    DWORD size = ::SizeofResource(_pPaintManager->GetResourceDll(), hResource);
+    const void* data = ::LockResource(hGlobal);
+    if (data == nullptr || size == 0) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+
+    HANDLE hFile = ::CreateFileW(
+        Utf82Unicode(destPath).c_str(),
+        GENERIC_WRITE,
+        0,
+        NULL,
+        CREATE_ALWAYS,
+        FILE_ATTRIBUTE_NORMAL,
+        NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+
+    DWORD written = 0;
+    BOOL ok = ::WriteFile(hFile, data, size, &written, NULL);
+    ::CloseHandle(hFile);
+
+    lua_pushboolean(L, ok && written == size);
+    return 1;
+}
+
+extern "C"
 static int l_FilePathMakeDir(lua_State * L)
 {
     const char* path = luaL_checkstring(L, 1);
@@ -640,18 +697,54 @@ extern "C"
 static int l_FilePathUnzipAsync(lua_State * L)
 {
     if (lua_istable(L, 1)) {
+        std::vector<UINT> resourceIDs;
+        std::vector<InstallXpress_UnzipJob> jobs;
+        std::vector<std::wstring> skipPrefixes;
+        lua_pushnil(L);
+        while (lua_next(L, 1) != 0) {
+            if (lua_isinteger(L, -1)) {
+                resourceIDs.push_back((UINT)lua_tointeger(L, -1));
+            }
+            else if (lua_istable(L, -1)) {
+                InstallXpress_UnzipJob job;
+
+                lua_getfield(L, -1, "res");
+                if (lua_isinteger(L, -1))
+                    job.resourceID = (UINT)lua_tointeger(L, -1);
+                lua_pop(L, 1);
+
+                lua_getfield(L, -1, "dir");
+                if (lua_isstring(L, -1))
+                    job.unzipDir = Utf82Unicode(lua_tostring(L, -1));
+                lua_pop(L, 1);
+
+                lua_getfield(L, -1, "skipPrefixes");
+                if (lua_istable(L, -1)) {
+                    lua_pushnil(L);
+                    while (lua_next(L, -2) != 0) {
+                        if (lua_isstring(L, -1))
+                            job.skipPrefixes.push_back(Utf82Unicode(lua_tostring(L, -1)));
+                        lua_pop(L, 1);
+                    }
+                }
+                lua_pop(L, 1);
+
+                if (job.resourceID != 0 && !job.unzipDir.empty())
+                    jobs.push_back(job);
+            }
+            lua_pop(L, 1);
+        }
+
+        if (!jobs.empty()) {
+            int ret = CMainFrame::GetInstance()->UnzipFileAsync(jobs);
+            lua_pushboolean(L, ret >= 0);
+            return 1;
+        }
+
         const char* destDir = luaL_checkstring(L, 2);
         if (destDir == nullptr) {
             lua_pushboolean(L, false);
             return 1;
-        }
-        std::vector<UINT> resourceIDs;
-        std::vector<std::wstring> skipPrefixes;
-        lua_pushnil(L);
-        while (lua_next(L, 1) != 0) {
-            if (lua_isinteger(L, -1))
-                resourceIDs.push_back((UINT)lua_tointeger(L, -1));
-            lua_pop(L, 1);
         }
         if (lua_istable(L, 3)) {
             lua_pushnil(L);
@@ -1262,6 +1355,7 @@ static const luaL_Reg reglib[] = {
     {"FilePathExists", l_FilePathExists},
     {"FilePathGetSpecialLocation", l_FilePathGetSpecialLocation},
     {"FilePathMkdir", l_FilePathMakeDir},
+    {"FilePathSaveResource", l_FilePathSaveResource},
     {"FilePathUnzip", l_FilePathUnzipAsync},
 
     {"LogPrint", l_LogPrint},
@@ -1474,7 +1568,14 @@ int lua_base::load_file(const char* fullpath)
 
 int lua_base::load_string(const char* cstr)
 {
-    int ret = luaL_dostring(lua_, cstr);
+    return load_string(cstr, cstr ? strlen(cstr) : 0);
+}
+
+int lua_base::load_string(const char* cstr, size_t len)
+{
+    int ret = (cstr == nullptr) ? LUA_ERRSYNTAX : luaL_loadbuffer(lua_, cstr, len, "Install.lua");
+    if (ret == 0)
+        ret = lua_pcall(lua_, 0, LUA_MULTRET, 0);
     if (ret != 0) {
         const char* err = lua_tostring(lua_, -1);
         std::string msg = err ? err : "unknown error";

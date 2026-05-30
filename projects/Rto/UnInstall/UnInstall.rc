@@ -37,9 +37,11 @@ IDR_MAIN_XML            XML                     "res\\UnInstallDialog.xml"
 // PNG
 //
 
-IDB_LOGO_PNG            PNG                     "res\\loginlogo.png"
+IDB_LOGO_PNG            PNG                     "..\\Install\\res\\loginlogo.png"
 
 IDB_PNG2                PNG                     "res\\setup.png"
+
+IDB_RES_BACKGROUND      PNG                     "..\\Install\\res\\background.png"
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -231,4 +233,3 @@ END
 
 /////////////////////////////////////////////////////////////////////////////
 #endif    // not APSTUDIO_INVOKED
-

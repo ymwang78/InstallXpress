@@ -16,6 +16,7 @@
 #define IDB_BK_PNG                      131
 #define IDB_PNG2                        131
 #define IDR_ACCELERATOR1                132
+#define IDB_RES_BACKGROUND              138
 #define IDR_LUA_SCRIPT1                 133
 #define IDR_LUA_SCRIPT2                 134
 #define IDR_LUA_SCRIPT                  135

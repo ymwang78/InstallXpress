@@ -113,6 +113,12 @@
     <Manifest>
       <AdditionalManifestFiles>%(AdditionalManifestFiles)</AdditionalManifestFiles>
     </Manifest>
+    <PreBuildEvent>
+      <Command>if exist "$(ProjectDir)..\UnInstall\$(Platform)\$(Configuration)\UnInstall.exe" copy /Y "$(ProjectDir)..\UnInstall\$(Platform)\$(Configuration)\UnInstall.exe" "$(ProjectDir)res\UnInstall.exe"
+if exist "$(SolutionDir)$(Platform)\$(Configuration)\UnInstall.exe" copy /Y "$(SolutionDir)$(Platform)\$(Configuration)\UnInstall.exe" "$(ProjectDir)res\UnInstall.exe"
+if exist "$(SolutionDir)bin\$(Platform)\$(Configuration)\UnInstall.exe" copy /Y "$(SolutionDir)bin\$(Platform)\$(Configuration)\UnInstall.exe" "$(ProjectDir)res\UnInstall.exe"
+if not exist "$(ProjectDir)res\UnInstall.exe" exit /b 1</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -136,6 +142,12 @@
     <ManifestResourceCompile>
       <ResourceOutputFileName />
     </ManifestResourceCompile>
+    <PreBuildEvent>
+      <Command>if exist "$(ProjectDir)..\UnInstall\$(Platform)\$(Configuration)\UnInstall.exe" copy /Y "$(ProjectDir)..\UnInstall\$(Platform)\$(Configuration)\UnInstall.exe" "$(ProjectDir)res\UnInstall.exe"
+if exist "$(SolutionDir)$(Platform)\$(Configuration)\UnInstall.exe" copy /Y "$(SolutionDir)$(Platform)\$(Configuration)\UnInstall.exe" "$(ProjectDir)res\UnInstall.exe"
+if exist "$(SolutionDir)bin\$(Platform)\$(Configuration)\UnInstall.exe" copy /Y "$(SolutionDir)bin\$(Platform)\$(Configuration)\UnInstall.exe" "$(ProjectDir)res\UnInstall.exe"
+if not exist "$(ProjectDir)res\UnInstall.exe" exit /b 1</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -158,6 +170,12 @@
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
       <GenerateDebugInformation>false</GenerateDebugInformation>
     </Link>
+    <PreBuildEvent>
+      <Command>if exist "$(ProjectDir)..\UnInstall\$(Platform)\$(Configuration)\UnInstall.exe" copy /Y "$(ProjectDir)..\UnInstall\$(Platform)\$(Configuration)\UnInstall.exe" "$(ProjectDir)res\UnInstall.exe"
+if exist "$(SolutionDir)$(Platform)\$(Configuration)\UnInstall.exe" copy /Y "$(SolutionDir)$(Platform)\$(Configuration)\UnInstall.exe" "$(ProjectDir)res\UnInstall.exe"
+if exist "$(SolutionDir)bin\$(Platform)\$(Configuration)\UnInstall.exe" copy /Y "$(SolutionDir)bin\$(Platform)\$(Configuration)\UnInstall.exe" "$(ProjectDir)res\UnInstall.exe"
+if not exist "$(ProjectDir)res\UnInstall.exe" exit /b 1</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -180,6 +198,12 @@
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
       <AdditionalOptions>/VERBOSE:LIB %(AdditionalOptions)</AdditionalOptions>
     </Link>
+    <PreBuildEvent>
+      <Command>if exist "$(ProjectDir)..\UnInstall\$(Platform)\$(Configuration)\UnInstall.exe" copy /Y "$(ProjectDir)..\UnInstall\$(Platform)\$(Configuration)\UnInstall.exe" "$(ProjectDir)res\UnInstall.exe"
+if exist "$(SolutionDir)$(Platform)\$(Configuration)\UnInstall.exe" copy /Y "$(SolutionDir)$(Platform)\$(Configuration)\UnInstall.exe" "$(ProjectDir)res\UnInstall.exe"
+if exist "$(SolutionDir)bin\$(Platform)\$(Configuration)\UnInstall.exe" copy /Y "$(SolutionDir)bin\$(Platform)\$(Configuration)\UnInstall.exe" "$(ProjectDir)res\UnInstall.exe"
+if not exist "$(ProjectDir)res\UnInstall.exe" exit /b 1</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <Text Include="res\UserLicense.txt" />
@@ -219,6 +243,24 @@
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="res\Install.exe.manifest" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\UnInstall\UnInstall.vcxproj">
+      <Project>{153c8a51-8f4d-4a4b-9bf0-537b0d47bb6c}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\libsrc\7z\lib7z.vcxproj">
+      <Project>{ba53e298-de6f-407c-a096-1553e76e4587}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\libsrc\DuiLib\DuiLib.vcxproj">
+      <Project>{e106acd7-4e53-4aee-942b-d0dd426db34e}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\libsrc\InstallXpress\InstallXpress.vcxproj">
+      <Project>{a69bebba-bfc0-4dd4-9eee-36922e830a3c}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\libsrc\Utility\Utility.vcxproj">
+      <Project>{0ed8b12d-8289-42da-8c26-d618e8952c0c}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

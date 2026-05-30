@@ -8,7 +8,7 @@
 #include <TlHelp32.h>
 #include "Utility/Utility.h"
 #include <Utility/DirUtility.h>
-#include <Utility/LuaExtention.h>
+#include <InstallXpress/LuaExtention.h>
 #include <Utility/ResourceHandler.h>
 
 #pragma comment(lib, "liblua.lib")
@@ -24,55 +24,57 @@
 #define  LEFTOFFSET 40            //进度条左侧距离;
 #define  BUTTONMINSIZE 200		  //按钮最小值;
 
-CMainFrame::CMainFrame()
+CUninstallMainFrame::CUninstallMainFrame()
 	:m_bUninstall(false)
 {
 	m_pUnInstallprogress = NULL;
 	m_pStarUnInstallbtn = NULL;
 	m_pUnFinishbtn = NULL;
+	m_luaPtr = NULL;
+	m_hThread = NULL;
 	m_strname = _T("");
 	m_strplid = _T("zdey");
 }
 
 
-CMainFrame::~CMainFrame()
+CUninstallMainFrame::~CUninstallMainFrame()
 {
 	PostQuitMessage(0);
 }
 
-void CMainFrame::InitWindow()
+void CUninstallMainFrame::InitWindow()
 {
 	CenterWindow();
 }
 
-LPCTSTR CMainFrame::GetWindowClassName(void) const
+LPCTSTR CUninstallMainFrame::GetWindowClassName(void) const
 {
-	return _T("ZhiduMainFrame");
+	return _T("TaijiMPCUnInstallFrame");
 }
 
-CDuiString CMainFrame::GetSkinFile()
+CDuiString CUninstallMainFrame::GetSkinFile()
 {
 	TCHAR szBuf[MAX_PATH] = { 0 };
 	_stprintf_s(szBuf, MAX_PATH - 1, _T("%d"), IDR_MAIN_XML);
 	return szBuf;
 }
 
-CDuiString CMainFrame::GetSkinFolder()
+CDuiString CUninstallMainFrame::GetSkinFolder()
 {
 	return _T("");
 }
 
-UILIB_RESOURCETYPE CMainFrame::GetResourceType() const
+UILIB_RESOURCETYPE CUninstallMainFrame::GetResourceType() const
 {
 	return UILIB_RESOURCE;
 }
 
-void CMainFrame::OnFinalMessage(HWND hWnd)
+void CUninstallMainFrame::OnFinalMessage(HWND hWnd)
 {
 	delete this;
 }
 
-ResourceHandler* CMainFrame::LoadResourceFile(UINT uId, LPCTSTR lpType)
+ResourceHandler* CUninstallMainFrame::LoadResourceFile(UINT uId, LPCTSTR lpType)
 {
     auto iter = m_resHandlerMap.find(uId);
     if (iter != m_resHandlerMap.end())
@@ -86,7 +88,7 @@ ResourceHandler* CMainFrame::LoadResourceFile(UINT uId, LPCTSTR lpType)
     return handler;
 }
 
-void CMainFrame::Notify(TNotifyUI& msg)
+void CUninstallMainFrame::Notify(TNotifyUI& msg)
 {
 	if (_tcsicmp(msg.sType, DUI_MSGTYPE_WINDOWINIT) == 0)
 	{
@@ -104,7 +106,7 @@ void CMainFrame::Notify(TNotifyUI& msg)
         ResourceHandler* luaScript = LoadResourceFile(IDR_LUA_SCRIPT, _T("LUA_SCRIPT"));
         m_luaPtr->load_string((const char*)luaScript->GetData());
 #endif
-        m_luaPtr->Initialize();
+        m_luaPtr->OnInitialize();
 	}
 	else if (_tcsicmp(msg.sType, DUI_MSGTYPE_CLICK) == 0)
 	{
@@ -115,13 +117,10 @@ void CMainFrame::Notify(TNotifyUI& msg)
 
 			if (m_pCloseBtn) m_pCloseBtn->SetEnabled(false);
 			SetTimer(this->GetHWND(), WMPROGRESS_TIMER, PORGRESSSHOWSEPLEN, 0);
-
-            m_luaPtr->PreSetup();
-
 		}
 		else if (_tcsicmp(msg.pSender->GetName(), _T("uninstallfinishbtn")) == 0)
 		{
-			ClearUnInstall();			
+			ClearUnInstall();
 		}
 		else if (_tcsicmp(msg.pSender->GetName(), _T("closebtn")) == 0)
 		{
@@ -133,7 +132,7 @@ void CMainFrame::Notify(TNotifyUI& msg)
 	}
 }
 
-LRESULT CMainFrame::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
+LRESULT CUninstallMainFrame::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	if (uMsg == WM_TIMER)
 	{
@@ -150,7 +149,7 @@ LRESULT CMainFrame::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 				{
 					m_pUnInstallprogress->SetValue(15);
 					::KillTimer(this->GetHWND(), WMPROGRESS_TIMER);
-					m_hThread = (HANDLE)_beginthreadex(NULL, 0, &CMainFrame::UnInstallThread, this, 0, NULL);
+					m_hThread = (HANDLE)_beginthreadex(NULL, 0, &CUninstallMainFrame::UnInstallThread, this, 0, NULL);
 					return 0;
 				}
 				rc.left -= MOVESIZE;
@@ -183,7 +182,7 @@ LRESULT CMainFrame::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 	return WindowImplBase::HandleMessage(uMsg, wParam, lParam);
 }
 
-LRESULT CMainFrame::HandleCustomMessage(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled)
+LRESULT CUninstallMainFrame::HandleCustomMessage(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled)
 {
 	if (WM_INSTALLPROGRES_MSG == uMsg)
 	{
@@ -199,21 +198,16 @@ LRESULT CMainFrame::HandleCustomMessage(UINT uMsg, WPARAM wParam, LPARAM lParam,
 	return WindowImplBase::HandleCustomMessage(uMsg, wParam, lParam, bHandled);
 }
 
-unsigned int _stdcall CMainFrame::UnInstallThread(void* param)
+unsigned int _stdcall CUninstallMainFrame::UnInstallThread(void* param)
 {
-	CMainFrame* pThis = (CMainFrame*)param;
+	CUninstallMainFrame* pThis = (CUninstallMainFrame*)param;
 	if (NULL != pThis)
 		pThis->UnInstall();
 	return 0;
 }
 
-void CMainFrame::ClearUnInstall()
+void CUninstallMainFrame::ClearUnInstall()
 {
-	std::wstring strsite = m_strname;
-	std::wstring strdesp = m_strname;
-	std::wstring strpath = _T("");
-	std::wstring strProdname = m_strname;
-	
 	CRegOperation reg;
     std::wstring strkey = L"Software" L"\\" COMPANYNAME;
 
@@ -225,12 +219,10 @@ void CMainFrame::ClearUnInstall()
 	PostMessage(WM_CLOSE, 0, 0);
 }
 
-void CMainFrame::UnInstall()
+void CUninstallMainFrame::UnInstall()
 {
 	m_pUnInstallprogress->SetText(_T("已卸载1%..."));
 	m_strUnInstallDir = CDirUtility::GetProgramInPath();
-	//int lastpos = m_strUnInstallDir.find_last_of('\\');
-	//m_strUnInstallDir = m_strUnInstallDir.substr(0, lastpos);
     std::wstring wstrdir = CTypeConvertUtil::StringToWstring(m_strUnInstallDir);
 
 	CDuiString hintString;
@@ -246,6 +238,11 @@ void CMainFrame::UnInstall()
         SetTimer(this->GetHWND(), WMPROGRESSFINISH_TIMER, PORGRESSHIDESEPLEN, 0);
         return;
     }
+
+    // Product-specific cleanup (services, COM, registry, shortcuts, sibling
+    // directories) is implemented in UnInstall.lua PreSetup().
+    if (m_luaPtr)
+        m_luaPtr->PreSetup();
 
 	int nUnInstall = 0;  //要删除文件个数;
 	int ndelindex = 0;	 //已删除文件个数;
@@ -264,7 +261,7 @@ void CMainFrame::UnInstall()
 	SetTimer(this->GetHWND(), WMPROGRESSFINISH_TIMER, PORGRESSHIDESEPLEN, 0);
 }
 
-void CMainFrame::GetUnInstallSize(std::wstring &strFile, int &nUnInstall)
+void CUninstallMainFrame::GetUnInstallSize(std::wstring &strFile, int &nUnInstall)
 {
 	if (strFile[strFile.length() - 1] != '\\')
 	{
@@ -297,7 +294,7 @@ void CMainFrame::GetUnInstallSize(std::wstring &strFile, int &nUnInstall)
 	nUnInstall++;
 }
 
-void CMainFrame::DeleteAllFile(std::wstring &strFile, int &nCurUnInstall, int nUnInstall)
+void CUninstallMainFrame::DeleteAllFile(std::wstring &strFile, int &nCurUnInstall, int nUnInstall)
 {
 	if (strFile[strFile.length() - 1] != '\\')
 	{
@@ -349,7 +346,7 @@ void CMainFrame::DeleteAllFile(std::wstring &strFile, int &nCurUnInstall, int nU
 	Sleep(60);
 }
 
-void CMainFrame::KillProcess()
+void CUninstallMainFrame::KillProcess()
 {
 	ProcessPrivilege(true);
 	//创建进程快照;
@@ -390,7 +387,7 @@ void CMainFrame::KillProcess()
 	CloseHandle(hSnapshot);
 }
 
-BOOL CMainFrame::ProcessPrivilege(BOOL bEnable)
+BOOL CUninstallMainFrame::ProcessPrivilege(BOOL bEnable)
 {
 	BOOL                   bResult = TRUE;
 	HANDLE               hToken = INVALID_HANDLE_VALUE;
