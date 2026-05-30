@@ -1,81 +1,91 @@
-local HRootKey = {
-    HKEY_CLASSES_ROOT = 0,
-    HKEY_CURRENT_USER = 1,
-    HKEY_LOCAL_MACHINE = 2,
-    HKEY_USERS = 3,
-    HKEY_CURRENT_CONFIG = 4
-};
+-- HRootKey, CSIDL, RunBatchFile, ErrorHint are provided by the framework base library.
 
-local CSIDL_Enum = {
-    CSIDL_DESKTOP                   =0,
-    CSIDL_INTERNET                  =1,
-    CSIDL_PROGRAMS                  =2,
-    CSIDL_CONTROLS                  =3,
-    CSIDL_PRINTERS                  =4,
-    CSIDL_PERSONAL                  =5,
-    CSIDL_FAVORITES                 =6,
-    CSIDL_STARTUP                   =7,
-    CSIDL_RECENT                    =8,
-    CSIDL_SENDTO                    =9,
-    CSIDL_BITBUCKET                 =10,
-    CSIDL_STARTMENU                 =11,
-    CSIDL_MYDOCUMENTS               =5,
-    CSIDL_MYMUSIC                   =13,
-    CSIDL_MYVIDEO                   =14,
-    CSIDL_DESKTOPDIRECTORY          =16,
-    CSIDL_DRIVES                    =17,
-    CSIDL_NETWORK                   =18,
-    CSIDL_NETHOOD                   =19,
-    CSIDL_FONTS                     =20,
-    CSIDL_TEMPLATES                 =21,
-    CSIDL_COMMON_STARTMENU          =22,
-    CSIDL_COMMON_PROGRAMS           =23,
-    CSIDL_COMMON_STARTUP            =24,
-    CSIDL_COMMON_DESKTOPDIRECTORY   =25,
-    CSIDL_APPDATA                   =26,
-    CSIDL_PRINTHOOD                 =27,
-    CSIDL_PROGRAM_FILES             =38,
-};
+local DEFAULT_INSTALL_PATH = "C:\\ZJU"
 
-dirCompany = "C:\\TaijiControl"
-dirExeHomeDir = dirCompany .. "\\TaiJiMPC"
-dirExeFullPath = dirCompany .. "\\TaiJiMPC\\TaiJiMPC.exe"
+local dirCompany = DEFAULT_INSTALL_PATH
+local dirExeHomeDir = dirCompany .. "\\Rto"
+local dirExeFullPath = dirExeHomeDir .. "\\xRto.exe"
 
-function Initialize()
-    dirCompany = install.RegGetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl", "InstallPath")
-    if (dirCompany == nil or dirCompany == "") then
-        dirCompany = "C:\\TaijiControl"
+local function resetInstallPath(installPath)
+    if installPath == nil or installPath == "" then
+        installPath = DEFAULT_INSTALL_PATH
     end
-    dirExeHomeDir = dirCompany .. "\\TaiJiMPC"
-    dirExeFullPath = dirCompany .. "\\TaiJiMPC\\TaiJiMPC.exe"
+    dirCompany = installPath
+    dirExeHomeDir = dirCompany .. "\\Rto"
+    dirExeFullPath = dirExeHomeDir .. "\\xRto.exe"
 end
 
-function ResetInstallPath(installPath)
-    dirCompany = installPath
-    dirExeHomeDir = dirCompany .. "\\TaiJiMPC"
-    dirExeFullPath = dirCompany .. "\\TaiJiMPC\\TaiJiMPC.exe"
+local function deleteIfExists(path)
+    if path ~= nil and path ~= "" and installx.FilePathExists(path) then
+        installx.LogPrint("Delete: " .. path)
+        return installx.FilePathDelete(path)
+    end
+    installx.LogPrint("Skip missing: " .. tostring(path))
+    return true
+end
+
+local function normalizePath(path)
+    local value = tostring(path or "")
+    value = value:gsub("/", "\\")
+    value = value:gsub("\\+$", "")
+    return value:lower()
+end
+
+local function removePathEntries(...)
+    local envKey = "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"
+    local pathValue = installx.RegGetValue(HRootKey.HKEY_LOCAL_MACHINE, envKey, "Path")
+    if pathValue == nil or pathValue == "" then
+        return
+    end
+
+    local removals = {}
+    for _, path in ipairs({...}) do
+        removals[normalizePath(path)] = true
+    end
+
+    local kept = {}
+    for entry in tostring(pathValue):gmatch("([^;]+)") do
+        if entry ~= "" and not removals[normalizePath(entry)] then
+            table.insert(kept, entry)
+        end
+    end
+
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, envKey, "Path", table.concat(kept, ";"))
+end
+
+function OnInitialize()
+    resetInstallPath(installx.RegGetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\ZJU", "InstallPath"))
+    installx.LogPrint("RTO uninstall path: " .. dirCompany)
 end
 
 function PreSetup()
-    install.KillProcess("TaiJiMPC.exe")
-    install.KillProcess("HostVM.exe")
-    install.KillProcess("TaiJiOPCSim.exe")
-    install.RunShell(dirCompany .. "\\TaiJiOPCSim\\bin\\TaiJiOPCSim.exe -UnRegServer")
-    install.RunShell(dirCompany .. "\\HostVM\\HostVM.exe --uninstall HostVM")
-    install.RegDeleteValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl", "InstallPath")
-    install.RegDeleteKey(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\TaiJiMPC")
-    install.RegDeleteKey(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", "TaiJiMPC")
-    install.RegDeleteKey(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\uninstall", "TaiJiMPC")
+    installx.LogPrint("Start RTO uninstall cleanup")
 
-    desktopDir = install.GetSpecialFolderLocation(CSIDL_Enum.CSIDL_COMMON_DESKTOPDIRECTORY)
-    install.DeleteFile(desktopDir .. "\\TaiJiMPC.lnk")
+    installx.ProcessKill("xRto.exe")
 
-    startMenuDir = install.GetSpecialFolderLocation(CSIDL_Enum.CSIDL_COMMON_STARTMENU)
-    install.DeleteDirectory(startMenuDir .. "\\Programs\\TaijiControl")
+    installx.RegDeleteValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", "Rto")
+    installx.RegDeleteKey(HRootKey.HKEY_LOCAL_MACHINE, "Software\\ZJU", "Rto")
+    installx.RegDeleteKey(HRootKey.HKEY_LOCAL_MACHINE, "Software\\ZJU", "PythonEnv")
+    installx.RegDeleteValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\ZJU", "InstallPath")
+    installx.RegDeleteKey(HRootKey.HKEY_LOCAL_MACHINE, "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall", "Rto")
 
-    --install.DeleteDirectory(dirCompany .. "\\TaiJiMPC")
-    install.DeleteDirectory(dirCompany .. "\\TaiJiOPCSim")
-    install.DeleteDirectory(dirCompany .. "\\Common")
+    removePathEntries(dirCompany .. "\\WinPy312\\python", dirCompany .. "\\WinPy312\\python\\Scripts")
+    installx.RegDeleteValue(
+        HRootKey.HKEY_LOCAL_MACHINE,
+        "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment",
+        "PYTHONHOME")
+
+    local desktopDir = installx.FilePathGetSpecialLocation(CSIDL.COMMON_DESKTOPDIRECTORY)
+    deleteIfExists(desktopDir .. "\\Rto.lnk")
+
+    local startMenuDir = installx.FilePathGetSpecialLocation(CSIDL.COMMON_STARTMENU)
+    deleteIfExists(startMenuDir .. "\\Programs\\ZJU\\Rto.lnk")
+    deleteIfExists(startMenuDir .. "\\Programs\\ZJU")
+
+    -- Do not delete dirExeHomeDir here because UnInstall.exe is running from it.
+    -- The native host removes that directory after this scripted cleanup.
+    deleteIfExists(dirCompany .. "\\WinPy312")
+    deleteIfExists(dirCompany .. "\\Common")
 end
 
 function PostSetup()
@@ -85,7 +95,11 @@ function OnButtonClick(btnName)
 end
 
 function QueryByKey(keyName)
-    if (keyName == "InstallPath") then
+    if keyName == "InstallPath" then
         return dirCompany
+    elseif keyName == "AppPath" then
+        return dirExeFullPath
+    elseif keyName == "AppHome" then
+        return dirExeHomeDir
     end
 end

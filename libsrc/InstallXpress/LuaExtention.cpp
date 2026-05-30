@@ -1548,6 +1548,12 @@ void InstallLua::ResetInstallPath(const std::string& strInstallPath)
     func(strInstallPath);
 }
 
+void InstallLua::PreSetup()
+{
+    lua_function<void> func(lua_, "PreSetup");
+    func();
+}
+
 void InstallLua::PostSetup()
 {
     lua_function<void> func(lua_, "PostSetup");

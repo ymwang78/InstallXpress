@@ -6,6 +6,9 @@
 
 #pragma comment(lib, "duilib.lib")
 #pragma comment(lib, "Utility.lib")
+#pragma comment(lib, "lib7z.lib")
+#pragma comment(lib, "lua.lib")
+#pragma comment(lib, "InstallXpress.lib")
 #if SUPPORT_WEBP
 #pragma comment(lib, "libwebp.lib")
 #endif

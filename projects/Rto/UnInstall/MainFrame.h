@@ -2,11 +2,11 @@
 class InstallLua;
 class ResourceHandler;
 
-class CMainFrame : public WindowImplBase
+class CUninstallMainFrame : public WindowImplBase
 {
 public:
-	CMainFrame();
-	~CMainFrame();
+	CUninstallMainFrame();
+	~CUninstallMainFrame();
 
 public:
 	void InitWindow();
@@ -45,4 +45,3 @@ public:
 	CButtonUI*      m_pCloseBtn;
     std::map<UINT, ResourceHandler*> m_resHandlerMap;
 };
-

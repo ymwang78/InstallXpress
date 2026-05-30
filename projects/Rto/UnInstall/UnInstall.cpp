@@ -28,10 +28,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	if (strCmdLine.Find(_T("/D=")) >= 0)
 		bUpdate = true;
 
-	CMainFrame* pMainFrame = new CMainFrame();
+	CUninstallMainFrame* pMainFrame = new CUninstallMainFrame();
 	if (pMainFrame)
 	{
-		pMainFrame->Create(NULL, _T("°²×°³ÌÐò"), UI_CLASSSTYLE_DIALOG, WS_EX_STATICEDGE | WS_EX_APPWINDOW, 0, 0, 0, 0);
+		pMainFrame->Create(NULL, _T("ï¿½ï¿½×°ï¿½ï¿½ï¿½ï¿½"), UI_CLASSSTYLE_DIALOG, WS_EX_STATICEDGE | WS_EX_APPWINDOW, 0, 0, 0, 0);
 		pMainFrame->ShowWindow();
 		CPaintManagerUI::MessageLoop();
 	}

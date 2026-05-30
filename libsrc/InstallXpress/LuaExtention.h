@@ -356,6 +356,8 @@ public:
 
     void ResetInstallPath(const std::string& strInstallPath);
 
+    void PreSetup();
+
     void PostSetup();
 
     std::string QueryByKey_String(const std::string& keyName);
