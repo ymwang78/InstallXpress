@@ -16,6 +16,9 @@ local _dirExeFullPath = _dirCompany .. "\\Rto\\xRto.exe"
 
 local _bCustomPath = false
 local _installData = false
+local _activeResources = {}
+local _resourceProgress = {}
+local _lastLoggedPercent = -1
 
 local _strResourceCN = {
 	SETUP = "浙大RTO安装程序",
@@ -114,29 +117,15 @@ end
 local _image_index = 0
 local _lastPercent = 0   -- prevents progress bar going backwards during parallel extraction
 
--- Progress ranges based on actual 7z file sizes (Rto:163MB, WinPy312:1121MB, Data:29MB, total ~1312MB)
--- SOFT1 (Rto.7z,  163MB): 5%~16%  (11 points, ~12%)
--- SOFT2 (WinPy312.7z, 1121MB): 16%~90% (74 points, ~85%)
--- SOFT3 (Data.7z, 29MB): 90%~92% (2 points, ~3%)
+-- Progress weights based on actual 7z file sizes:
+-- Rto:163MB, WinPy312:1121MB, Data:29MB. Extraction maps to 5%~92%.
+local _resourceWeights = {
+	[RES.SOFT1] = 163,
+	[RES.SOFT2] = 1121,
+	[RES.SOFT3] = 29,
+}
 
-function OnUnzipProgress(nNotifyID, nTotalFileNum, nCurFileIndex, nTotalSize, nCurrentSize)
-	-- If this is the callback with completion values (-1), skip updating progress here
-	if nCurFileIndex == -1 or nTotalFileNum == -1 then
-		return
-	end
-
-	local percent
-
-	if nNotifyID == RES.SOFT1 then
-		percent = 5 + math.floor(11 * nCurFileIndex / nTotalFileNum)
-	elseif nNotifyID == RES.SOFT2 then
-		percent = 16 + math.floor(54 * nCurFileIndex / nTotalFileNum)
-	elseif nNotifyID == RES.SOFT3 then
-		percent = 70 + math.floor(2 * nCurFileIndex / nTotalFileNum)
-	else
-		return
-	end
-	-- Clamp to avoid backwards steps when packages extract in parallel
+function UpdateInstallProgress(percent)
 	if percent <= _lastPercent then return end
 	_lastPercent = percent
 
@@ -152,6 +141,44 @@ function OnUnzipProgress(nNotifyID, nTotalFileNum, nCurFileIndex, nTotalSize, nC
 		installx.DuiSetBkImage("mainlayout", bgRes .. " source='0,222,600,442' corner='300,208,5,5'")
 	end
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
+
+	if percent ~= _lastLoggedPercent then
+		_lastLoggedPercent = percent
+		installx.LogPrint("Progress: " .. percent .. "%")
+	end
+end
+
+function CalculateExtractionPercent()
+	local totalWeight = 0
+	local doneWeight = 0
+	for _, resourceID in ipairs(_activeResources) do
+		local weight = _resourceWeights[resourceID] or 0
+		totalWeight = totalWeight + weight
+		doneWeight = doneWeight + weight * (_resourceProgress[resourceID] or 0)
+	end
+	if totalWeight <= 0 then
+		return 5
+	end
+	return 5 + math.floor(87 * doneWeight / totalWeight)
+end
+
+function OnUnzipProgress(nNotifyID, nTotalFileNum, nCurFileIndex, nTotalSize, nCurrentSize)
+	-- If this is the callback with completion values (-1), skip updating progress here.
+	if nCurFileIndex == -1 or nTotalFileNum == -1 then
+		return
+	end
+	if _resourceWeights[nNotifyID] == nil or nTotalFileNum <= 0 then
+		return
+	end
+
+	local progress = (nCurFileIndex + 1) / nTotalFileNum
+	if progress < 0 then progress = 0 end
+	if progress > 1 then progress = 1 end
+	if progress > (_resourceProgress[nNotifyID] or 0) then
+		_resourceProgress[nNotifyID] = progress
+	end
+
+	UpdateInstallProgress(CalculateExtractionPercent())
 end
 
 function CheckDiskSpace()
@@ -221,34 +248,36 @@ function StartSetup()
 		installx.LogPrint("Skip data.7z, directory already exists: " .. _dirData)
 		installx.LogPrint("Skip data entries from bundled archives as well")
 	end
+	_activeResources = resourceIDs
+	_resourceProgress = {}
+	for _, resourceID in ipairs(_activeResources) do
+		_resourceProgress[resourceID] = 0
+	end
 
 	installx.LogPrint("Unzip selected resources in one pass...")
+	UpdateInstallProgress(5)
 	installx.FilePathUnzip(resourceIDs, _dirCompany, skipPrefixes)
 end
 
 function PostSetup()
 
-	local percent = 94
-	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
+	UpdateInstallProgress(94)
     local vcRedist = installx.RegGetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64", "Installed")
     if (vcRedist == nil or vcRedist == 0) then
         installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\redist\\vc_redist.x64.exe\" /install /quiet /norestart", true, 60)
     end
 
-	local percent = 95
-	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
+	UpdateInstallProgress(95)
     local opcEnum = installx.RegGetValue(HRootKey.HKEY_CLASSES_ROOT, "WOW6432Node\\CLSID\\{13486D50-4821-11D2-A494-3CB306C10000}", "")
     -- local opcEnum = installx.RegGetValue(HRootKey.HKEY_CLASSES_ROOT, "CLSID\\{13486D50-4821-11D2-A494-3CB306C10000}", "")
     if (opcEnum == nil or opcEnum == False) then
         installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\opc\\GBDA_Install_Prereq_x64.msi\" /quiet")
     end
 
-	local percent = 96
-	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
+	UpdateInstallProgress(96)
 
 
-	local percent = 97
-	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
+	UpdateInstallProgress(97)
 
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\ZJU", "InstallPath", _dirCompany)
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\ZJU\\Rto", "APPPath", _dirExeFullPath)
@@ -257,14 +286,13 @@ function PostSetup()
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\ZJU\\PythonEnv", "Version", "3.12")
 
     local desktopDir = installx.FilePathGetSpecialLocation(CSIDL.COMMON_DESKTOPDIRECTORY)
-    installx.FilePathCreateShortCut(desktopDir .. "\\xRto.lnk", _dirExeFullPath, _dirExeHomeDir, "xRto")
+    installx.FilePathCreateShortCut(desktopDir .. "\\Rto.lnk", _dirExeFullPath, _dirExeHomeDir, "Rto")
 
     local startMenuDir = installx.FilePathGetSpecialLocation(CSIDL.COMMON_STARTMENU)
     installx.FilePathMkdir(startMenuDir .. "\\Programs\\ZJU")
-    installx.FilePathCreateShortCut(startMenuDir .. "\\Programs\\ZJU\\xRto.lnk", _dirExeFullPath, _dirExeHomeDir, "xRto")
+    installx.FilePathCreateShortCut(startMenuDir .. "\\Programs\\ZJU\\Rto.lnk", _dirExeFullPath, _dirExeHomeDir, "Rto")
 
-	local percent = 99
-	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
+	UpdateInstallProgress(99)
 
     local UNINST_KEY = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "Rto")
@@ -275,8 +303,7 @@ function PostSetup()
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "Publisher", "ZJU")
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "UninstallString", _dirCompany .. "\\Rto\\UnInstall.exe")
 
-	local percent = 100
-	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
+	UpdateInstallProgress(100)
 
 end
 
@@ -313,7 +340,7 @@ function _FinishInstall()
 
     showTxtSelected = installx.DuiOptionSelect("showtxbtn")
     if showTxtSelected then
-        -- show update ？ show install log?
+        -- show update or install log?
     end
 end
 

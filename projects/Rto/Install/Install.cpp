@@ -28,6 +28,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         szSkinXML,
         IDI_INSTALL,
         IDR_LUA_SCRIPT,
+        false,
     };
 	return InstallXpress_WinMain(&init_t);
 }
