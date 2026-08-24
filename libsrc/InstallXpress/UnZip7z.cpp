@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "UnZip7z.h"
 #include <Shlwapi.h>
 #include "Utility/TypeConvertUtil.h"
@@ -215,11 +215,26 @@ void ForceRemoveExistingFile(const std::wstring& longPath)
         return;
     }
 
-    const std::wstring backupPath = longPath + L".ixp_old";
-    SetFileAttributesW(backupPath.c_str(), FILE_ATTRIBUTE_NORMAL);
-    DeleteFileW(backupPath.c_str());
-    if (MoveFileExW(longPath.c_str(), backupPath.c_str(), MOVEFILE_REPLACE_EXISTING)) {
-        MoveFileExW(backupPath.c_str(), NULL, MOVEFILE_DELAY_UNTIL_REBOOT);
+    // The file is in use: rename it aside under a collision-resistant name and
+    // schedule the renamed copy for deletion on reboot. Never touch an existing
+    // sibling — the rename is done without MOVEFILE_REPLACE_EXISTING, so a name
+    // that gets claimed concurrently makes the move fail instead of destroying
+    // that file, and we simply try the next suffix.
+    for (unsigned attempt = 0; attempt < 100; ++attempt) {
+        wchar_t suffix[64];
+        swprintf_s(suffix, L".%lu.%u.ixp_old", GetCurrentProcessId(), attempt);
+        const std::wstring backupPath = longPath + suffix;
+        if (GetFileAttributesW(backupPath.c_str()) != INVALID_FILE_ATTRIBUTES) {
+            continue;
+        }
+        if (MoveFileExW(longPath.c_str(), backupPath.c_str(), 0)) {
+            MoveFileExW(backupPath.c_str(), NULL, MOVEFILE_DELAY_UNTIL_REBOOT);
+            return;
+        }
+        const DWORD moveError = GetLastError();
+        if (moveError != ERROR_ALREADY_EXISTS && moveError != ERROR_FILE_EXISTS) {
+            return; // the target itself cannot be moved; caller re-prompts
+        }
     }
 }
 
@@ -229,7 +244,7 @@ typedef HRESULT(WINAPI* TaskDialogIndirect_t)(const TASKDIALOGCONFIG*, int*, int
 // built from shell32's embedded manifest, so the dialog works regardless of the
 // host executable's own manifest. Returns true and fills *button / *applyToAll on
 // success; returns false when TaskDialog is unavailable so the caller can fall back.
-bool ShowWriteFailureTaskDialog(const std::wstring& filePath, int* button, bool* applyToAll)
+bool ShowWriteFailureTaskDialog(const std::wstring& filePath, bool allowOverwrite, int* button, bool* applyToAll)
 {
     HMODULE shell32 = GetModuleHandleW(L"shell32.dll");
     bool shell32Loaded = false;
@@ -259,12 +274,14 @@ bool ShowWriteFailureTaskDialog(const std::wstring& filePath, int* button, bool*
     if (pTaskDialog) {
         const std::wstring content = L"\x5199\x5165\x6587\x4EF6:<" + filePath + L">\x5931\x8D25"; // write file:<path> failed
 
-        TASKDIALOG_BUTTON buttons[] = {
-            { kOverwriteButtonId, L"\x8986\x76D6" }, // overwrite (clears read-only)
-            { IDRETRY,  L"\x91CD\x8BD5" },   // retry
-            { IDIGNORE, L"\x5FFD\x7565" },   // ignore
-            { IDABORT,  L"\x4E2D\x6B62" },   // abort
-        };
+        TASKDIALOG_BUTTON buttons[4];
+        UINT buttonCount = 0;
+        if (allowOverwrite) {
+            buttons[buttonCount++] = { kOverwriteButtonId, L"\x8986\x76D6" }; // overwrite (clears read-only)
+        }
+        buttons[buttonCount++] = { IDRETRY,  L"\x91CD\x8BD5" };   // retry
+        buttons[buttonCount++] = { IDIGNORE, L"\x5FFD\x7565" };   // ignore
+        buttons[buttonCount++] = { IDABORT,  L"\x4E2D\x6B62" };   // abort
 
         TASKDIALOGCONFIG cfg{};
         cfg.cbSize = sizeof(cfg);
@@ -273,9 +290,9 @@ bool ShowWriteFailureTaskDialog(const std::wstring& filePath, int* button, bool*
         cfg.pszMainIcon = TD_WARNING_ICON;
         cfg.pszMainInstruction = L"\x5199\x5165\x6587\x4EF6\x5931\x8D25"; // write file failed
         cfg.pszContent = content.c_str();
-        cfg.cButtons = ARRAYSIZE(buttons);
+        cfg.cButtons = buttonCount;
         cfg.pButtons = buttons;
-        cfg.nDefaultButton = kOverwriteButtonId;
+        cfg.nDefaultButton = allowOverwrite ? kOverwriteButtonId : IDRETRY;
         cfg.pszVerificationText = L"\x90FD\x6309\x6B64\x5904\x7406"; // apply to all
 
         int pressed = 0;
@@ -296,18 +313,23 @@ bool ShowWriteFailureTaskDialog(const std::wstring& filePath, int* button, bool*
 
 // Prompts the user about a file-write failure, offering overwrite/retry/ignore/
 // abort plus an "apply to all" checkbox. Honors a previously remembered "apply to
-// all" decision so repeated failures don't keep interrupting the install. Returns
+// all" decision so repeated failures don't keep interrupting the install. Pass
+// allowOverwrite=false after a forced overwrite already failed for the current
+// file: the overwrite button is hidden and a remembered "overwrite all" choice
+// does not short-circuit, so the user must make an explicit decision instead of
+// the file being skipped as if "ignore" had been chosen. Returns
 // kOverwriteButtonId / IDRETRY / IDIGNORE / IDABORT.
-int PromptWriteFailure(const std::wstring& filePath)
+int PromptWriteFailure(const std::wstring& filePath, bool allowOverwrite)
 {
     std::lock_guard<std::mutex> lock(g_writeFailureMutex);
-    if (g_writeFailureChoice != 0) {
+    if (g_writeFailureChoice != 0 &&
+        (allowOverwrite || g_writeFailureChoice != kOverwriteButtonId)) {
         return g_writeFailureChoice;
     }
 
     int button = 0;
     bool applyToAll = false;
-    if (ShowWriteFailureTaskDialog(filePath, &button, &applyToAll)) {
+    if (ShowWriteFailureTaskDialog(filePath, allowOverwrite, &button, &applyToAll)) {
         // "Ignore" and "overwrite" are safe to apply to all; remembering retry would
         // loop forever on a genuinely unwritable file, and abort terminates the
         // installer anyway.
@@ -546,20 +568,15 @@ int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, const std::wstring &mUn
 					if (dLastError) {
                         res = SZ_ERROR_FAIL;
                         APPLOG(Log::LOG_ERROR)("\n---unzip_7z_file: OutFile_OpenW error, filename : %s ,last error:%lu---\n", WtoS(fullPath).c_str(), dLastError);
-                        int ret = PromptWriteFailure(fullPath);
+                        // After a failed forced overwrite the prompt comes back
+                        // without the overwrite option (and ignores a remembered
+                        // "overwrite all"), so skipping a file always requires an
+                        // explicit "ignore" from the user.
+                        int ret = PromptWriteFailure(fullPath, !forcedOverwrite);
                         if (ret == kOverwriteButtonId) {
-                            // Force-overwrite at most once per file; if the target
-                            // still can't be opened afterwards, skip it like "ignore"
-                            // so a remembered "overwrite all" can't loop forever.
-                            if (!forcedOverwrite) {
-                                forcedOverwrite = true;
-                                ForceRemoveExistingFile(longFullPath);
-                                continue;
-                            }
-                            APPLOG(Log::LOG_ERROR)(
-                                "\n---unzip_7z_file: force overwrite failed, skip file : %s ---\n",
-                                WtoS(fullPath).c_str());
-                            break;
+                            forcedOverwrite = true;
+                            ForceRemoveExistingFile(longFullPath);
+                            continue;
                         }
                         else if (ret == IDRETRY) {
                             continue;
