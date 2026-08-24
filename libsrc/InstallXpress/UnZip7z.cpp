@@ -187,11 +187,41 @@ bool ShouldSkipArchivePath(const std::wstring& archivePath, const std::vector<st
     return false;
 }
 
+// Custom TaskDialog button id for "overwrite": force-clear blocking attributes
+// (read-only/hidden/system) and remove the existing file before writing again.
+constexpr int kOverwriteButtonId = 100;
+
 // Remembered "apply to all" decision for file-write failures. Shared across all
 // parallel extraction threads so that repeated failures (e.g. many read-only
-// files) prompt the user only once. 0 = ask; otherwise holds IDIGNORE.
+// files) prompt the user only once. 0 = ask; otherwise holds IDIGNORE or
+// kOverwriteButtonId.
 std::mutex g_writeFailureMutex;
 int g_writeFailureChoice = 0;
+
+// Clears blocking attributes and removes the existing target so the extraction
+// can recreate it. Read-only/hidden/system files are stripped to NORMAL first;
+// a file that is in use (delete fails) is renamed aside and scheduled for
+// deletion on reboot so the new copy can take its place now.
+void ForceRemoveExistingFile(const std::wstring& longPath)
+{
+    DWORD attrs = GetFileAttributesW(longPath.c_str());
+    if (attrs == INVALID_FILE_ATTRIBUTES) {
+        return; // nothing on disk; the open failed for another reason
+    }
+    if (attrs & (FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)) {
+        SetFileAttributesW(longPath.c_str(), FILE_ATTRIBUTE_NORMAL);
+    }
+    if (DeleteFileW(longPath.c_str())) {
+        return;
+    }
+
+    const std::wstring backupPath = longPath + L".ixp_old";
+    SetFileAttributesW(backupPath.c_str(), FILE_ATTRIBUTE_NORMAL);
+    DeleteFileW(backupPath.c_str());
+    if (MoveFileExW(longPath.c_str(), backupPath.c_str(), MOVEFILE_REPLACE_EXISTING)) {
+        MoveFileExW(backupPath.c_str(), NULL, MOVEFILE_DELAY_UNTIL_REBOOT);
+    }
+}
 
 typedef HRESULT(WINAPI* TaskDialogIndirect_t)(const TASKDIALOGCONFIG*, int*, int*, BOOL*);
 
@@ -230,6 +260,7 @@ bool ShowWriteFailureTaskDialog(const std::wstring& filePath, int* button, bool*
         const std::wstring content = L"\x5199\x5165\x6587\x4EF6:<" + filePath + L">\x5931\x8D25"; // write file:<path> failed
 
         TASKDIALOG_BUTTON buttons[] = {
+            { kOverwriteButtonId, L"\x8986\x76D6" }, // overwrite (clears read-only)
             { IDRETRY,  L"\x91CD\x8BD5" },   // retry
             { IDIGNORE, L"\x5FFD\x7565" },   // ignore
             { IDABORT,  L"\x4E2D\x6B62" },   // abort
@@ -244,7 +275,7 @@ bool ShowWriteFailureTaskDialog(const std::wstring& filePath, int* button, bool*
         cfg.pszContent = content.c_str();
         cfg.cButtons = ARRAYSIZE(buttons);
         cfg.pButtons = buttons;
-        cfg.nDefaultButton = IDRETRY;
+        cfg.nDefaultButton = kOverwriteButtonId;
         cfg.pszVerificationText = L"\x90FD\x6309\x6B64\x5904\x7406"; // apply to all
 
         int pressed = 0;
@@ -263,10 +294,10 @@ bool ShowWriteFailureTaskDialog(const std::wstring& filePath, int* button, bool*
     return shown;
 }
 
-// Prompts the user about a file-write failure, offering retry/ignore/abort plus an
-// "apply to all" checkbox. Honors a previously remembered "ignore all" decision so
-// repeated failures don't keep interrupting the install. Returns IDRETRY / IDIGNORE
-// / IDABORT.
+// Prompts the user about a file-write failure, offering overwrite/retry/ignore/
+// abort plus an "apply to all" checkbox. Honors a previously remembered "apply to
+// all" decision so repeated failures don't keep interrupting the install. Returns
+// kOverwriteButtonId / IDRETRY / IDIGNORE / IDABORT.
 int PromptWriteFailure(const std::wstring& filePath)
 {
     std::lock_guard<std::mutex> lock(g_writeFailureMutex);
@@ -277,10 +308,11 @@ int PromptWriteFailure(const std::wstring& filePath)
     int button = 0;
     bool applyToAll = false;
     if (ShowWriteFailureTaskDialog(filePath, &button, &applyToAll)) {
-        // Only "ignore" is safe to apply to all; remembering retry would loop forever
-        // on a genuinely unwritable file, and abort terminates the installer anyway.
-        if (applyToAll && button == IDIGNORE) {
-            g_writeFailureChoice = IDIGNORE;
+        // "Ignore" and "overwrite" are safe to apply to all; remembering retry would
+        // loop forever on a genuinely unwritable file, and abort terminates the
+        // installer anyway.
+        if (applyToAll && (button == IDIGNORE || button == kOverwriteButtonId)) {
+            g_writeFailureChoice = button;
         }
         return button;
     }
@@ -491,6 +523,7 @@ int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, const std::wstring &mUn
                 delete pNotifyMsg;
                 break;
             }
+			bool forcedOverwrite = false;
 			do {
 				res = 0;
                 DWORD dLastError = OutFile_OpenW(&outFile, longFullPath.c_str());
@@ -514,7 +547,21 @@ int CUnZip7z::unzip_7z_file(ResourceHandler* resHandler, const std::wstring &mUn
                         res = SZ_ERROR_FAIL;
                         APPLOG(Log::LOG_ERROR)("\n---unzip_7z_file: OutFile_OpenW error, filename : %s ,last error:%lu---\n", WtoS(fullPath).c_str(), dLastError);
                         int ret = PromptWriteFailure(fullPath);
-                        if (ret == IDRETRY) {
+                        if (ret == kOverwriteButtonId) {
+                            // Force-overwrite at most once per file; if the target
+                            // still can't be opened afterwards, skip it like "ignore"
+                            // so a remembered "overwrite all" can't loop forever.
+                            if (!forcedOverwrite) {
+                                forcedOverwrite = true;
+                                ForceRemoveExistingFile(longFullPath);
+                                continue;
+                            }
+                            APPLOG(Log::LOG_ERROR)(
+                                "\n---unzip_7z_file: force overwrite failed, skip file : %s ---\n",
+                                WtoS(fullPath).c_str());
+                            break;
+                        }
+                        else if (ret == IDRETRY) {
                             continue;
                         }
                         else if (ret == IDIGNORE) {
