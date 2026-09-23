@@ -301,12 +301,20 @@ function PostSetup()
 
     local desktopDir = installx.FilePathGetSpecialLocation(CSIDL.COMMON_DESKTOPDIRECTORY)
     installx.FilePathCreateShortCut(desktopDir .. "\\TaiJiMPC5.lnk", _dirExeFullPath, _dirExeHomeDir, "TaiJiMPC5")
-    installx.FilePathCreateShortCut(desktopDir .. "\\TaiJiMPC6.lnk", _dirExe6FullPath, _dirExe6HomeDir, "TaiJiMPC6")
+    -- TaiJiMPC5 封版包不带 TaiJiMPC6 客户端，exe 不在就不建它的快捷方式。
+    local hasExe6 = installx.FilePathExists(_dirExe6FullPath)
+    if hasExe6 then
+        installx.FilePathCreateShortCut(desktopDir .. "\\TaiJiMPC6.lnk", _dirExe6FullPath, _dirExe6HomeDir, "TaiJiMPC6")
+    else
+        installx.LogPrint("Skip TaiJiMPC6 shortcuts, not found: " .. _dirExe6FullPath)
+    end
 
     local startMenuDir = installx.FilePathGetSpecialLocation(CSIDL.COMMON_STARTMENU)
     installx.FilePathMkdir(startMenuDir .. "\\Programs\\TaijiControl")
     installx.FilePathCreateShortCut(startMenuDir .. "\\Programs\\TaijiControl\\TaiJiMPC5.lnk", _dirExeFullPath, _dirExeHomeDir, "TaiJiMPC5")
-    installx.FilePathCreateShortCut(startMenuDir .. "\\Programs\\TaijiControl\\TaiJiMPC6.lnk", _dirExe6FullPath, _dirExe6HomeDir, "TaiJiMPC6")
+    if hasExe6 then
+        installx.FilePathCreateShortCut(startMenuDir .. "\\Programs\\TaijiControl\\TaiJiMPC6.lnk", _dirExe6FullPath, _dirExe6HomeDir, "TaiJiMPC6")
+    end
 
 	local percent = 98
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
