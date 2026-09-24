@@ -9,12 +9,11 @@ local RES = {
     BACKGROUND = 138, -- IDB_RES_BACKGROUND
 }
 
+-- apps/xOptCon/build_TaijiMPC6.py writes the release version here at build time and restores it afterwards.
 local _VERSION = "5.2.41.3"
 local _dirCompany = "C:\\TaijiControl"
-local _dirExeHomeDir = _dirCompany .. "\\TaiJiMPC5"
-local _dirExeFullPath = _dirCompany .. "\\TaiJiMPC5\\TaiJiMPC.exe"
-local _dirExe6HomeDir = _dirCompany .. "\\TaiJiMPC6"
-local _dirExe6FullPath = _dirCompany .. "\\TaiJiMPC6\\TaiJiMPC.exe"
+local _dirExeHomeDir = _dirCompany .. "\\TaiJiMPC6"
+local _dirExeFullPath = _dirCompany .. "\\TaiJiMPC6\\TaiJiMPC.exe"
 
 local _bCustomPath = false
 local _installTaiJiDataSvc = false
@@ -43,10 +42,8 @@ local _strResource = _strResourceCN
 
 function ResetInstallPath(installPath)
     _dirCompany = installPath
-    _dirExeHomeDir = _dirCompany .. "\\TaiJiMPC5"
-    _dirExeFullPath = _dirCompany .. "\\TaiJiMPC5\\TaiJiMPC.exe"
-    _dirExe6HomeDir = _dirCompany .. "\\TaiJiMPC6"
-    _dirExe6FullPath = _dirCompany .. "\\TaiJiMPC6\\TaiJiMPC.exe"
+    _dirExeHomeDir = _dirCompany .. "\\TaiJiMPC6"
+    _dirExeFullPath = _dirCompany .. "\\TaiJiMPC6\\TaiJiMPC.exe"
 end
 
 function OnInitialize()
@@ -243,13 +240,32 @@ function StartSetup()
 	installx.FilePathUnzip(resourceIDs, _dirCompany, skipPrefixes)
 end
 
+-- The package ships HostVM\hostvm.default.xml but never hostvm.xml: once hostvm.xml exists it belongs
+-- to the site (ports, thread counts, the ident secret key), so an upgrade must keep it. Only a fresh
+-- install, where hostvm.xml does not exist yet, starts from the bundled default.
+function InstallHostVMConfig()
+    local defaultConfig = _dirCompany .. "\\HostVM\\hostvm.default.xml"
+    local siteConfig = _dirCompany .. "\\HostVM\\hostvm.xml"
+    if installx.FilePathExists(siteConfig) then
+        installx.LogPrint("Keep existing HostVM config: " .. siteConfig)
+        return
+    end
+    -- FilePathCopy passes its third argument to CopyFile as bFailIfExists, so it is not relied on
+    -- here; the existence check above is what keeps a site config from being overwritten.
+    if installx.FilePathCopy(defaultConfig, siteConfig) then
+        installx.LogPrint("Created HostVM config from " .. defaultConfig)
+    else
+        installx.LogPrint("Failed to create HostVM config from " .. defaultConfig)
+    end
+end
+
 function PostSetup()
 
 	local percent = 94
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
     local vcRedist = installx.RegGetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64", "Installed")
     if (vcRedist == nil or vcRedist == 0) then
-        installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\redist\\vc_redist.x64.exe\" /install /quiet /norestart", true, 60)
+        installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\vcredist\\vc_redist.x64.exe\" /install /quiet /norestart", true, 60)
     end
 
 	local percent = 95
@@ -288,36 +304,28 @@ function PostSetup()
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
 
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl", "InstallPath", _dirCompany)
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\TaiJiMPC5", "APPPath", _dirExeFullPath)
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\TaiJiMPC5", "Version", _VERSION)
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\TaiJiMPC6", "APPPath", _dirExeFullPath)
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\TaiJiMPC6", "Version", _VERSION)
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\PythonEnv", "InstallPath", _dirCompany .. "\\WinPy313\\python")
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\PythonEnv", "Version", "3.13")
 
 	installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl", "InstallPath", _dirCompany)
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\TaiJiMPC5", "APPPath", _dirExeFullPath)
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\TaiJiMPC5", "Version", _VERSION)
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\TaiJiMPC6", "APPPath", _dirExeFullPath)
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\TaiJiMPC6", "Version", _VERSION)
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\PythonEnv", "InstallPath", _dirCompany .. "\\WinPy313\\python")
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\PythonEnv", "Version", "3.13")
 
     local desktopDir = installx.FilePathGetSpecialLocation(CSIDL.COMMON_DESKTOPDIRECTORY)
-    installx.FilePathCreateShortCut(desktopDir .. "\\TaiJiMPC5.lnk", _dirExeFullPath, _dirExeHomeDir, "TaiJiMPC5")
-    -- TaiJiMPC5 封版包不带 TaiJiMPC6 客户端，exe 不在就不建它的快捷方式。
-    local hasExe6 = installx.FilePathExists(_dirExe6FullPath)
-    if hasExe6 then
-        installx.FilePathCreateShortCut(desktopDir .. "\\TaiJiMPC6.lnk", _dirExe6FullPath, _dirExe6HomeDir, "TaiJiMPC6")
-    else
-        installx.LogPrint("Skip TaiJiMPC6 shortcuts, not found: " .. _dirExe6FullPath)
-    end
+    installx.FilePathCreateShortCut(desktopDir .. "\\TaiJiMPC6.lnk", _dirExeFullPath, _dirExeHomeDir, "TaiJiMPC6")
 
     local startMenuDir = installx.FilePathGetSpecialLocation(CSIDL.COMMON_STARTMENU)
     installx.FilePathMkdir(startMenuDir .. "\\Programs\\TaijiControl")
-    installx.FilePathCreateShortCut(startMenuDir .. "\\Programs\\TaijiControl\\TaiJiMPC5.lnk", _dirExeFullPath, _dirExeHomeDir, "TaiJiMPC5")
-    if hasExe6 then
-        installx.FilePathCreateShortCut(startMenuDir .. "\\Programs\\TaijiControl\\TaiJiMPC6.lnk", _dirExe6FullPath, _dirExe6HomeDir, "TaiJiMPC6")
-    end
+    installx.FilePathCreateShortCut(startMenuDir .. "\\Programs\\TaijiControl\\TaiJiMPC6.lnk", _dirExeFullPath, _dirExeHomeDir, "TaiJiMPC6")
 
 	local percent = 98
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
+    -- HostVM reads hostvm.xml when the service starts, so the config has to be in place first.
+    InstallHostVMConfig()
     installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" service install HostVM")
     installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" service start HostVM")
 
@@ -325,13 +333,14 @@ function PostSetup()
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
 
     local UNINST_KEY = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "TaiJiMPC5")
-    UNINST_KEY = UNINST_KEY .. "\\TaiJiMPC5"
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "TaiJiMPC6")
+    UNINST_KEY = UNINST_KEY .. "\\TaiJiMPC6"
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayIcon", _dirExeFullPath)
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayName", "Tai-Ji MPC5")
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayName", "Tai-Ji MPC6")
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayVersion", _VERSION)
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "Publisher", "Tai-Ji Soft")
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "UninstallString", _dirCompany .. "\\TaiJiMPC5\\UnInstall.exe")
+    -- build_TaijiMPC6.py puts UnInstall.exe into TaijiMPC6\ of Win32.7z.
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "UninstallString", _dirExeHomeDir .. "\\UnInstall.exe")
 
 	local percent = 100
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
