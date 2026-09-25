@@ -26,6 +26,7 @@ local _strResourceCN = {
 	SPACE_HINT = "系统空间不足，需要500M以上空间，请另外选择安装位置",
 	MKDIR_FAILED = "创建目录失败: ",
 	LOADING = "正在加载",
+	HOSTVM_CONFIG_FAILED = "无法生成 HostVM 配置文件: ",
 }
 
 local _strResourceEN = {
@@ -36,6 +37,7 @@ local _strResourceEN = {
 	SPACE_HINT = "System space is not enough, need more than 500M, please choose another install path",
 	MKDIR_FAILED = "Make dir failed: ",
 	LOADING = "Loading",
+	HOSTVM_CONFIG_FAILED = "Failed to create the HostVM config: ",
 }
 
 local _strResource = _strResourceCN
@@ -243,23 +245,33 @@ end
 -- The package ships HostVM\hostvm.default.xml but never hostvm.xml: once hostvm.xml exists it belongs
 -- to the site (ports, thread counts, the ident secret key), so an upgrade must keep it. Only a fresh
 -- install, where hostvm.xml does not exist yet, starts from the bundled default.
+-- Returns false when a fresh install cannot get a hostvm.xml, after showing the error.
 function InstallHostVMConfig()
     local defaultConfig = _dirCompany .. "\\HostVM\\hostvm.default.xml"
     local siteConfig = _dirCompany .. "\\HostVM\\hostvm.xml"
     if installx.FilePathExists(siteConfig) then
         installx.LogPrint("Keep existing HostVM config: " .. siteConfig)
-        return
+        return true
     end
     -- FilePathCopy passes its third argument to CopyFile as bFailIfExists, so it is not relied on
     -- here; the existence check above is what keeps a site config from being overwritten.
     if installx.FilePathCopy(defaultConfig, siteConfig) then
         installx.LogPrint("Created HostVM config from " .. defaultConfig)
-    else
-        installx.LogPrint("Failed to create HostVM config from " .. defaultConfig)
+        return true
     end
+    ErrorHint(_strResource.HOSTVM_CONFIG_FAILED .. siteConfig)
+    return false
 end
 
+-- Returning false tells the installer that setup did not complete: it shows the failure and
+-- enables the close button instead of moving on to the finish page.
 function PostSetup()
+
+    -- Without hostvm.xml the HostVM service cannot start. Checking it first means a failure stops
+    -- before any runtime, service, registry or shortcut is touched.
+    if not InstallHostVMConfig() then
+        return false
+    end
 
 	local percent = 94
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
@@ -324,17 +336,14 @@ function PostSetup()
 
 	local percent = 98
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
-    -- HostVM reads hostvm.xml when the service starts, so the config has to be in place first.
-    InstallHostVMConfig()
     installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" service install HostVM")
     installx.ProcessExecute("\"" .. _dirCompany .. "\\HostVM\\HostVM.exe\" service start HostVM")
 
 	local percent = 99
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
 
-    local UNINST_KEY = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "TaiJiMPC6")
-    UNINST_KEY = UNINST_KEY .. "\\TaiJiMPC6"
+    -- The first RegSetValue below creates the TaiJiMPC6 key.
+    local UNINST_KEY = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\TaiJiMPC6"
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayIcon", _dirExeFullPath)
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayName", "Tai-Ji MPC6")
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayVersion", _VERSION)

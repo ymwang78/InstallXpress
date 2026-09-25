@@ -191,8 +191,15 @@ LRESULT CMainFrame::HandleCustomMessage(UINT uMsg, WPARAM wParam, LPARAM lParam,
         }
         else {
             m_luaPtr->OnUnzipProgress(nNotifyID, -1, -1, -1, -1);
-            m_luaPtr->PostSetup();
-            if (m_pInit->bSilentInstall) {
+            if (!m_luaPtr->PostSetup()) {
+                // The script reported that setup cannot complete: stay on the progress page instead
+                // of playing the finish animation, so the installer does not claim success.
+                APPLOG(Log::LOG_ERROR)("Installation failed in PostSetup\n");
+                if (m_pProgress) m_pProgress->SetText(_T("安装失败"));
+                if (m_pCloseBtn) m_pCloseBtn->SetEnabled(true);
+                if (m_pInit->bSilentInstall) PostMessage(WM_CLOSE, 0, 0);
+            }
+            else if (m_pInit->bSilentInstall) {
                 APPLOG(Log::LOG_TRACE)("Silent install completed; closing installer\n");
                 PostMessage(WM_CLOSE, 0, 0);
             }

@@ -1505,7 +1505,7 @@ void lua_function_base::push_value(lua_State* vm, const std::string& s)
     lua_pushstring(vm, s.c_str());
 }
 
-void lua_function_base::call(int args, int results)
+bool lua_function_base::call(int args, int results)
 {
     // Push traceback handler before args/function
     lua_pushcfunction(m_vm, [](lua_State* L) -> int {
@@ -1527,7 +1527,9 @@ void lua_function_base::call(int args, int results)
             OutputDebugStringA("\n");
         }
         lua_pop(m_vm, 1);
+        return false;
     }
+    return true;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1655,10 +1657,35 @@ void InstallLua::PreSetup()
     func();
 }
 
-void InstallLua::PostSetup()
+namespace {
+
+// Calls a Lua function that may report failure by returning false; see InstallLua::PostSetup.
+class LuaStatusFunction : public lua_function_base
 {
-    lua_function<void> func(lua_, "PostSetup");
-    func();
+public:
+    LuaStatusFunction(lua_State* vm, const std::string& func)
+        : lua_function_base(vm, func)
+    {
+    }
+
+    bool operator()()
+    {
+        lua_rawgeti(m_vm, LUA_REGISTRYINDEX, m_func);
+        if (!call(0, 1)) {
+            return true;  // already logged by call(); a Lua error has never failed the installation
+        }
+        bool explicit_false = lua_isboolean(m_vm, -1) && !lua_toboolean(m_vm, -1);
+        lua_pop(m_vm, 1);
+        return !explicit_false;
+    }
+};
+
+}  // namespace
+
+bool InstallLua::PostSetup()
+{
+    LuaStatusFunction func(lua_, "PostSetup");
+    return func();
 }
 
 
