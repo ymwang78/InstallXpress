@@ -276,25 +276,61 @@ local OPC_IID_IOPCSERVER = "{39C13A4D-011E-11D0-9675-0020AFD8ADB3}"       -- pro
 local OPC_IID_IOPCSERVERLIST = "{13486D50-4821-11D2-A494-3CB306C10000}"   -- proxy/stub in opccomn_ps.dll
 local OPC_CLSID_OPCSERVERLIST = "{13486D51-4821-11D2-A494-3CB306C10000}"  -- OpcEnum.exe
 
-local function RegKeyHasDefault(path)
-    local value = installx.RegGetValue(HRootKey.HKEY_CLASSES_ROOT, path, "")
-    return value ~= nil and value ~= ""
+-- Default value of an HKCR key, or nil. Not RegGetValue(root, path, ""): that only reports that the
+-- key exists, which an empty leftover key passes too.
+local function RegDefault(path)
+    local value = installx.RegGetDefaultValue(HRootKey.HKEY_CLASSES_ROOT, path)
+    if value == nil or value == "" then
+        return nil
+    end
+    return tostring(value)
 end
 
--- True when COM can marshal the OPC interfaces in the given registry view ("" or "WOW6432Node\\").
-local function OpcProxiesRegistered(view)
-    return RegKeyHasDefault(view .. "Interface\\" .. OPC_IID_IOPCSERVER .. "\\ProxyStubClsid32")
-        and RegKeyHasDefault(view .. "Interface\\" .. OPC_IID_IOPCSERVERLIST .. "\\ProxyStubClsid32")
+-- True when the file a COM server registration points at exists. LocalServer32 may be quoted and
+-- carry arguments. In the 32-bit view ("WOW6432Node\\") System32 means SysWOW64, which is where a
+-- 32-bit process gets redirected; this installer is 64-bit and is not.
+local function ComServerFileExists(view, serverPath)
+    if serverPath == nil then
+        return false
+    end
+    local path = serverPath:match('^"([^"]+)"') or serverPath
+    if view ~= "" then
+        local first, last = path:lower():find("\\system32\\", 1, true)
+        if first then
+            path = path:sub(1, first) .. "SysWOW64" .. path:sub(last)
+        end
+    end
+    return installx.FilePathExists(path)
+end
+
+-- True when COM in the given registry view ("" or "WOW6432Node\\") can marshal the interface: it
+-- names a proxy/stub class, and that class's DLL is on disk.
+local function OpcProxyUsable(view, iid)
+    local proxyClsid = RegDefault(view .. "Interface\\" .. iid .. "\\ProxyStubClsid32")
+    if proxyClsid == nil then
+        return false
+    end
+    return ComServerFileExists(view, RegDefault(view .. "CLSID\\" .. proxyClsid .. "\\InprocServer32"))
+end
+
+local function OpcProxiesUsable(view)
+    return OpcProxyUsable(view, OPC_IID_IOPCSERVER) and OpcProxyUsable(view, OPC_IID_IOPCSERVERLIST)
+end
+
+-- OpcEnum is only ever registered in the 32-bit view.
+local function OpcEnumUsable()
+    local view = "WOW6432Node\\"
+    return ComServerFileExists(view, RegDefault(view .. "CLSID\\" .. OPC_CLSID_OPCSERVERLIST .. "\\LocalServer32"))
 end
 
 function InstallOpcCoreComponents()
     local opcDir = _dirCompany .. "\\Common\\opc\\"
-    if OpcProxiesRegistered("WOW6432Node\\") and RegKeyHasDefault("WOW6432Node\\CLSID\\" .. OPC_CLSID_OPCSERVERLIST) then
+    if OpcProxiesUsable("WOW6432Node\\") and OpcEnumUsable() then
         installx.LogPrint("Skip OPC core components x86, already registered")
     else
         installx.ProcessExecute("\"" .. opcDir .. "GBDA_Install_Prereq_x86.msi\" /quiet")
     end
-    if OpcProxiesRegistered("") then
+    if OpcProxiesUsable("") then
         installx.LogPrint("Skip OPC core components x64, already registered")
     else
         installx.ProcessExecute("\"" .. opcDir .. "GBDA_Install_Prereq_x64.msi\" /quiet")

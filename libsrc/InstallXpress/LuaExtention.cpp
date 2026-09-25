@@ -861,8 +861,37 @@ static int l_RunAsAdmin(lua_State * L)
 }
 
 
+// Pushes value `name` of an open key: REG_DWORD as an integer, REG_SZ as a string, anything else
+// (including a missing value) as nil. An empty name reads the key's default value.
+static void PushRegistryValue(lua_State* L, HKEY hKey, const std::wstring& name)
+{
+    DWORD lValueType = 0;
+    // One spare wchar_t that RegQueryValueEx never writes keeps an unterminated REG_SZ terminated.
+    unsigned char data[1024 + sizeof(wchar_t)] = { 0 };
+    DWORD dataSize = 1024;
+    if (RegQueryValueEx(hKey, name.c_str(), NULL, &lValueType, (LPBYTE)&data, &dataSize) != ERROR_SUCCESS) {
+        lua_pushnil(L);
+        return;
+    }
+
+    switch (lValueType) {
+    case REG_DWORD: {
+        lua_pushinteger(L, *(DWORD*)data);
+        break;
+    }
+    case REG_SZ: {
+        lua_pushstring(L, UnicodeToUtf8((wchar_t*)data).c_str());
+        break;
+    }
+    default: {
+        lua_pushnil(L);
+        break;
+    }
+    }
+}
+
 extern "C"
-static int l_RegGetValue(lua_State* L) 
+static int l_RegGetValue(lua_State* L)
 {
     lua_Integer rootKeyID = lua_tointeger(L, 1);
     const char* path = luaL_checkstring(L, 2);
@@ -892,31 +921,31 @@ static int l_RegGetValue(lua_State* L)
         return 1;
     }
 
-    DWORD lValueType = 0;
-    unsigned char data[1024];
-    DWORD dataSize = sizeof(data);
-    if (RegQueryValueEx(hKey, Utf82Unicode(key).c_str(), NULL, &lValueType, (LPBYTE)&data, &dataSize) != ERROR_SUCCESS) {
-        RegCloseKey(hKey);
+    PushRegistryValue(L, hKey, Utf82Unicode(key));
+    RegCloseKey(hKey);
+    return 1;
+}
+
+// RegGetDefaultValue(root, path): the key's default value, or nil when the key or its default value
+// is missing. RegGetValue cannot read it: an empty value name there only tests that the key exists.
+extern "C"
+static int l_RegGetDefaultValue(lua_State* L)
+{
+    lua_Integer rootKeyID = lua_tointeger(L, 1);
+    const char* path = luaL_checkstring(L, 2);
+
+    if (rootKeyID < 0 || rootKeyID >= sizeof(_hRootKeyID) / sizeof(_hRootKeyID[0]) || path == nullptr) {
         lua_pushnil(L);
         return 1;
     }
 
-    switch (lValueType) {
-    case REG_DWORD: {
-        lua_pushinteger(L, *(DWORD*)data);
-        break;
-    }
-    case REG_SZ: {
-        lua_pushstring(L, UnicodeToUtf8((wchar_t*)data).c_str());
-        break;
-    }
-    default: {
+    HKEY hKey;
+    if (RegOpenKeyEx(_hRootKeyID[rootKeyID], Utf82Unicode(path).c_str(), 0, KEY_READ, &hKey) != ERROR_SUCCESS) {
         lua_pushnil(L);
-        break;
-    }
+        return 1;
     }
 
-    // 返回值
+    PushRegistryValue(L, hKey, L"");
     RegCloseKey(hKey);
     return 1;
 }
@@ -1366,6 +1395,7 @@ static const luaL_Reg reglib[] = {
     {"RunAsAdmin", l_RunAsAdmin},
 
     {"RegGetValue", l_RegGetValue},
+    {"RegGetDefaultValue", l_RegGetDefaultValue},
     {"RegSetValue", l_RegSetValue},
     {"RegDeleteValue", l_RegDeleteValue},
     {"RegDeleteKey", l_RegDeleteKey},
