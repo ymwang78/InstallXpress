@@ -243,23 +243,92 @@ function StartSetup()
 	installx.FilePathUnzip(resourceIDs, _dirCompany, skipPrefixes)
 end
 
+-- OPC core components come in two Graybox packages, one per bitness, and each carries what the
+-- other lacks:
+--   x86: OpcEnum.exe (the OPC server browser, which only exists as 32-bit) and the 32-bit
+--        proxy/stubs. Needed by the 32-bit DA servers TaiJiOPCSim and TaiJiPYSim\opcserver_win_i386,
+--        and by every client that browses servers through OpcEnum.
+--   x64: the 64-bit proxy/stubs only. Needed by HostVM's DA client (libidh, x64) to talk to DA
+--        servers and to the 32-bit OpcEnum.
+-- Each package is checked on its own, so a machine where other OPC software already installed the
+-- 32-bit half still gets the 64-bit half.
+local OPC_IID_IOPCSERVER = "{39C13A4D-011E-11D0-9675-0020AFD8ADB3}"       -- proxy/stub in opcproxy.dll
+local OPC_IID_IOPCSERVERLIST = "{13486D50-4821-11D2-A494-3CB306C10000}"   -- proxy/stub in opccomn_ps.dll
+local OPC_CLSID_OPCSERVERLIST = "{13486D51-4821-11D2-A494-3CB306C10000}"  -- OpcEnum.exe
+
+-- Default value of an HKCR key, or nil. Not RegGetValue(root, path, ""): that only reports that the
+-- key exists, which an empty leftover key passes too.
+local function RegDefault(path)
+    local value = installx.RegGetDefaultValue(HRootKey.HKEY_CLASSES_ROOT, path)
+    if value == nil or value == "" then
+        return nil
+    end
+    return tostring(value)
+end
+
+-- True when the file a COM server registration points at exists. LocalServer32 may be quoted and
+-- carry arguments. In the 32-bit view ("WOW6432Node\\") System32 means SysWOW64, which is where a
+-- 32-bit process gets redirected; this installer is 64-bit and is not.
+local function ComServerFileExists(view, serverPath)
+    if serverPath == nil then
+        return false
+    end
+    local path = serverPath:match('^"([^"]+)"') or serverPath
+    if view ~= "" then
+        local first, last = path:lower():find("\\system32\\", 1, true)
+        if first then
+            path = path:sub(1, first) .. "SysWOW64" .. path:sub(last)
+        end
+    end
+    return installx.FilePathExists(path)
+end
+
+-- True when COM in the given registry view ("" or "WOW6432Node\\") can marshal the interface: it
+-- names a proxy/stub class, and that class's DLL is on disk.
+local function OpcProxyUsable(view, iid)
+    local proxyClsid = RegDefault(view .. "Interface\\" .. iid .. "\\ProxyStubClsid32")
+    if proxyClsid == nil then
+        return false
+    end
+    return ComServerFileExists(view, RegDefault(view .. "CLSID\\" .. proxyClsid .. "\\InprocServer32"))
+end
+
+local function OpcProxiesUsable(view)
+    return OpcProxyUsable(view, OPC_IID_IOPCSERVER) and OpcProxyUsable(view, OPC_IID_IOPCSERVERLIST)
+end
+
+-- OpcEnum is only ever registered in the 32-bit view.
+local function OpcEnumUsable()
+    local view = "WOW6432Node\\"
+    return ComServerFileExists(view, RegDefault(view .. "CLSID\\" .. OPC_CLSID_OPCSERVERLIST .. "\\LocalServer32"))
+end
+
+function InstallOpcCoreComponents()
+    local opcDir = _dirCompany .. "\\Common\\opc\\"
+    if OpcProxiesUsable("WOW6432Node\\") and OpcEnumUsable() then
+        installx.LogPrint("Skip OPC core components x86, already registered")
+    else
+        installx.ProcessExecute("\"" .. opcDir .. "GBDA_Install_Prereq_x86.msi\" /quiet")
+    end
+    if OpcProxiesUsable("") then
+        installx.LogPrint("Skip OPC core components x64, already registered")
+    else
+        installx.ProcessExecute("\"" .. opcDir .. "GBDA_Install_Prereq_x64.msi\" /quiet")
+    end
+end
+
 function PostSetup()
 
 	local percent = 94
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
     local vcRedist = installx.RegGetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64", "Installed")
     if (vcRedist == nil or vcRedist == 0) then
-        installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\redist\\vc_redist.x64.exe\" /install /quiet /norestart", true, 60)
+        installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\vcredist\\vc_redist.x64.exe\" /install /quiet /norestart", true, 60)
     end
 
 	local percent = 95
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
-    local opcEnum = installx.RegGetValue(HRootKey.HKEY_CLASSES_ROOT, "WOW6432Node\\CLSID\\{13486D50-4821-11D2-A494-3CB306C10000}", "")
-    -- local opcEnum = installx.RegGetValue(HRootKey.HKEY_CLASSES_ROOT, "CLSID\\{13486D50-4821-11D2-A494-3CB306C10000}", "")
-    if (opcEnum == nil or opcEnum == False) then
-        installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\opc\\GBDA_Install_Prereq_x86.msi\" /quiet")
-        installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\opc\\GBDA_Install_Prereq_x64.msi\" /quiet")
-    end
+    InstallOpcCoreComponents()
 
 	local percent = 96
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
@@ -324,9 +393,8 @@ function PostSetup()
 	local percent = 99
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
 
-    local UNINST_KEY = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "TaiJiMPC5")
-    UNINST_KEY = UNINST_KEY .. "\\TaiJiMPC5"
+    -- The first RegSetValue below creates the TaiJiMPC5 key.
+    local UNINST_KEY = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\TaiJiMPC5"
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayIcon", _dirExeFullPath)
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayName", "Tai-Ji MPC5")
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayVersion", _VERSION)

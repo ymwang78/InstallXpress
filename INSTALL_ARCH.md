@@ -104,6 +104,7 @@ libsrc/InstallXpress/
 | 函数 | 说明 |
 |------|------|
 | `RegGetValue(rootKey, path, key)` | 读注册表值；key="" 仅判断路径是否存在 |
+| `RegGetDefaultValue(rootKey, path)` | 读键的默认值（REG_SZ/REG_DWORD），键或默认值不存在返回 nil |
 | `RegSetValue(rootKey, path, key, value)` | 写注册表值（自动创建路径） |
 | `RegDeleteValue(rootKey, path, key)` | 删除注册表值 |
 | `RegDeleteKey(rootKey, path, key)` | 递归删除注册表键 |

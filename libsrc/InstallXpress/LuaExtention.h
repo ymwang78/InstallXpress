@@ -115,7 +115,9 @@ protected:
 
     static void push_value(lua_State* vm, const std::string& s);
 
-    void call(int args, int results);
+    // Returns false when the Lua function raised an error; the error is logged and popped,
+    // so no result is left on the stack in that case.
+    bool call(int args, int results);
 };
 
 
@@ -359,7 +361,9 @@ public:
 
     void PreSetup();
 
-    void PostSetup();
+    // False only when the script's PostSetup explicitly returns false. No return value (nil) and a
+    // Lua error both count as success, which is how scripts written before this contract behave.
+    bool PostSetup();
 
     std::string QueryByKey_String(const std::string& keyName);
 

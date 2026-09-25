@@ -9,12 +9,11 @@ local RES = {
     BACKGROUND = 138, -- IDB_RES_BACKGROUND
 }
 
+-- apps/xOptCon/build_TaijiMPC6.py writes the release version here at build time and restores it afterwards.
 local _VERSION = "5.2.41.3"
 local _dirCompany = "C:\\TaijiControl"
-local _dirExeHomeDir = _dirCompany .. "\\TaiJiMPC5"
-local _dirExeFullPath = _dirCompany .. "\\TaiJiMPC5\\TaiJiMPC.exe"
-local _dirExe6HomeDir = _dirCompany .. "\\TaiJiMPC6"
-local _dirExe6FullPath = _dirCompany .. "\\TaiJiMPC6\\TaiJiMPC.exe"
+local _dirExeHomeDir = _dirCompany .. "\\TaiJiMPC6"
+local _dirExeFullPath = _dirCompany .. "\\TaiJiMPC6\\TaiJiMPC.exe"
 
 local _bCustomPath = false
 local _installTaiJiDataSvc = false
@@ -27,6 +26,7 @@ local _strResourceCN = {
 	SPACE_HINT = "系统空间不足，需要500M以上空间，请另外选择安装位置",
 	MKDIR_FAILED = "创建目录失败: ",
 	LOADING = "正在加载",
+	HOSTVM_CONFIG_FAILED = "无法生成 HostVM 配置文件: ",
 }
 
 local _strResourceEN = {
@@ -37,16 +37,15 @@ local _strResourceEN = {
 	SPACE_HINT = "System space is not enough, need more than 500M, please choose another install path",
 	MKDIR_FAILED = "Make dir failed: ",
 	LOADING = "Loading",
+	HOSTVM_CONFIG_FAILED = "Failed to create the HostVM config: ",
 }
 
 local _strResource = _strResourceCN
 
 function ResetInstallPath(installPath)
     _dirCompany = installPath
-    _dirExeHomeDir = _dirCompany .. "\\TaiJiMPC5"
-    _dirExeFullPath = _dirCompany .. "\\TaiJiMPC5\\TaiJiMPC.exe"
-    _dirExe6HomeDir = _dirCompany .. "\\TaiJiMPC6"
-    _dirExe6FullPath = _dirCompany .. "\\TaiJiMPC6\\TaiJiMPC.exe"
+    _dirExeHomeDir = _dirCompany .. "\\TaiJiMPC6"
+    _dirExeFullPath = _dirCompany .. "\\TaiJiMPC6\\TaiJiMPC.exe"
 end
 
 function OnInitialize()
@@ -243,23 +242,121 @@ function StartSetup()
 	installx.FilePathUnzip(resourceIDs, _dirCompany, skipPrefixes)
 end
 
+-- The package ships HostVM\hostvm.default.xml but never hostvm.xml: once hostvm.xml exists it belongs
+-- to the site (ports, thread counts, the ident secret key), so an upgrade must keep it. Only a fresh
+-- install, where hostvm.xml does not exist yet, starts from the bundled default.
+-- Returns false when a fresh install cannot get a hostvm.xml, after showing the error.
+function InstallHostVMConfig()
+    local defaultConfig = _dirCompany .. "\\HostVM\\hostvm.default.xml"
+    local siteConfig = _dirCompany .. "\\HostVM\\hostvm.xml"
+    if installx.FilePathExists(siteConfig) then
+        installx.LogPrint("Keep existing HostVM config: " .. siteConfig)
+        return true
+    end
+    -- FilePathCopy passes its third argument to CopyFile as bFailIfExists, so it is not relied on
+    -- here; the existence check above is what keeps a site config from being overwritten.
+    if installx.FilePathCopy(defaultConfig, siteConfig) then
+        installx.LogPrint("Created HostVM config from " .. defaultConfig)
+        return true
+    end
+    ErrorHint(_strResource.HOSTVM_CONFIG_FAILED .. siteConfig)
+    return false
+end
+
+-- OPC core components come in two Graybox packages, one per bitness, and each carries what the
+-- other lacks:
+--   x86: OpcEnum.exe (the OPC server browser, which only exists as 32-bit) and the 32-bit
+--        proxy/stubs. Needed by the 32-bit DA servers TaiJiOPCSim and TaiJiPYSim\opcserver_win_i386,
+--        and by every client that browses servers through OpcEnum.
+--   x64: the 64-bit proxy/stubs only. Needed by HostVM's DA client (libidh, x64) to talk to DA
+--        servers and to the 32-bit OpcEnum.
+-- Each package is checked on its own, so a machine where other OPC software already installed the
+-- 32-bit half still gets the 64-bit half.
+local OPC_IID_IOPCSERVER = "{39C13A4D-011E-11D0-9675-0020AFD8ADB3}"       -- proxy/stub in opcproxy.dll
+local OPC_IID_IOPCSERVERLIST = "{13486D50-4821-11D2-A494-3CB306C10000}"   -- proxy/stub in opccomn_ps.dll
+local OPC_CLSID_OPCSERVERLIST = "{13486D51-4821-11D2-A494-3CB306C10000}"  -- OpcEnum.exe
+
+-- Default value of an HKCR key, or nil. Not RegGetValue(root, path, ""): that only reports that the
+-- key exists, which an empty leftover key passes too.
+local function RegDefault(path)
+    local value = installx.RegGetDefaultValue(HRootKey.HKEY_CLASSES_ROOT, path)
+    if value == nil or value == "" then
+        return nil
+    end
+    return tostring(value)
+end
+
+-- True when the file a COM server registration points at exists. LocalServer32 may be quoted and
+-- carry arguments. In the 32-bit view ("WOW6432Node\\") System32 means SysWOW64, which is where a
+-- 32-bit process gets redirected; this installer is 64-bit and is not.
+local function ComServerFileExists(view, serverPath)
+    if serverPath == nil then
+        return false
+    end
+    local path = serverPath:match('^"([^"]+)"') or serverPath
+    if view ~= "" then
+        local first, last = path:lower():find("\\system32\\", 1, true)
+        if first then
+            path = path:sub(1, first) .. "SysWOW64" .. path:sub(last)
+        end
+    end
+    return installx.FilePathExists(path)
+end
+
+-- True when COM in the given registry view ("" or "WOW6432Node\\") can marshal the interface: it
+-- names a proxy/stub class, and that class's DLL is on disk.
+local function OpcProxyUsable(view, iid)
+    local proxyClsid = RegDefault(view .. "Interface\\" .. iid .. "\\ProxyStubClsid32")
+    if proxyClsid == nil then
+        return false
+    end
+    return ComServerFileExists(view, RegDefault(view .. "CLSID\\" .. proxyClsid .. "\\InprocServer32"))
+end
+
+local function OpcProxiesUsable(view)
+    return OpcProxyUsable(view, OPC_IID_IOPCSERVER) and OpcProxyUsable(view, OPC_IID_IOPCSERVERLIST)
+end
+
+-- OpcEnum is only ever registered in the 32-bit view.
+local function OpcEnumUsable()
+    local view = "WOW6432Node\\"
+    return ComServerFileExists(view, RegDefault(view .. "CLSID\\" .. OPC_CLSID_OPCSERVERLIST .. "\\LocalServer32"))
+end
+
+function InstallOpcCoreComponents()
+    local opcDir = _dirCompany .. "\\Common\\opc\\"
+    if OpcProxiesUsable("WOW6432Node\\") and OpcEnumUsable() then
+        installx.LogPrint("Skip OPC core components x86, already registered")
+    else
+        installx.ProcessExecute("\"" .. opcDir .. "GBDA_Install_Prereq_x86.msi\" /quiet")
+    end
+    if OpcProxiesUsable("") then
+        installx.LogPrint("Skip OPC core components x64, already registered")
+    else
+        installx.ProcessExecute("\"" .. opcDir .. "GBDA_Install_Prereq_x64.msi\" /quiet")
+    end
+end
+
+-- Returning false tells the installer that setup did not complete: it shows the failure and
+-- enables the close button instead of moving on to the finish page.
 function PostSetup()
+
+    -- Without hostvm.xml the HostVM service cannot start. Checking it first means a failure stops
+    -- before any runtime, service, registry or shortcut is touched.
+    if not InstallHostVMConfig() then
+        return false
+    end
 
 	local percent = 94
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
     local vcRedist = installx.RegGetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64", "Installed")
     if (vcRedist == nil or vcRedist == 0) then
-        installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\redist\\vc_redist.x64.exe\" /install /quiet /norestart", true, 60)
+        installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\vcredist\\vc_redist.x64.exe\" /install /quiet /norestart", true, 60)
     end
 
 	local percent = 95
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
-    local opcEnum = installx.RegGetValue(HRootKey.HKEY_CLASSES_ROOT, "WOW6432Node\\CLSID\\{13486D50-4821-11D2-A494-3CB306C10000}", "")
-    -- local opcEnum = installx.RegGetValue(HRootKey.HKEY_CLASSES_ROOT, "CLSID\\{13486D50-4821-11D2-A494-3CB306C10000}", "")
-    if (opcEnum == nil or opcEnum == False) then
-        installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\opc\\GBDA_Install_Prereq_x86.msi\" /quiet")
-        installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\opc\\GBDA_Install_Prereq_x64.msi\" /quiet")
-    end
+    InstallOpcCoreComponents()
 
 	local percent = 96
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
@@ -288,33 +385,23 @@ function PostSetup()
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
 
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl", "InstallPath", _dirCompany)
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\TaiJiMPC5", "APPPath", _dirExeFullPath)
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\TaiJiMPC5", "Version", _VERSION)
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\TaiJiMPC6", "APPPath", _dirExeFullPath)
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\TaiJiMPC6", "Version", _VERSION)
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\PythonEnv", "InstallPath", _dirCompany .. "\\WinPy313\\python")
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\TaijiControl\\PythonEnv", "Version", "3.13")
 
 	installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl", "InstallPath", _dirCompany)
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\TaiJiMPC5", "APPPath", _dirExeFullPath)
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\TaiJiMPC5", "Version", _VERSION)
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\TaiJiMPC6", "APPPath", _dirExeFullPath)
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\TaiJiMPC6", "Version", _VERSION)
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\PythonEnv", "InstallPath", _dirCompany .. "\\WinPy313\\python")
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node\\TaijiControl\\PythonEnv", "Version", "3.13")
 
     local desktopDir = installx.FilePathGetSpecialLocation(CSIDL.COMMON_DESKTOPDIRECTORY)
-    installx.FilePathCreateShortCut(desktopDir .. "\\TaiJiMPC5.lnk", _dirExeFullPath, _dirExeHomeDir, "TaiJiMPC5")
-    -- TaiJiMPC5 封版包不带 TaiJiMPC6 客户端，exe 不在就不建它的快捷方式。
-    local hasExe6 = installx.FilePathExists(_dirExe6FullPath)
-    if hasExe6 then
-        installx.FilePathCreateShortCut(desktopDir .. "\\TaiJiMPC6.lnk", _dirExe6FullPath, _dirExe6HomeDir, "TaiJiMPC6")
-    else
-        installx.LogPrint("Skip TaiJiMPC6 shortcuts, not found: " .. _dirExe6FullPath)
-    end
+    installx.FilePathCreateShortCut(desktopDir .. "\\TaiJiMPC6.lnk", _dirExeFullPath, _dirExeHomeDir, "TaiJiMPC6")
 
     local startMenuDir = installx.FilePathGetSpecialLocation(CSIDL.COMMON_STARTMENU)
     installx.FilePathMkdir(startMenuDir .. "\\Programs\\TaijiControl")
-    installx.FilePathCreateShortCut(startMenuDir .. "\\Programs\\TaijiControl\\TaiJiMPC5.lnk", _dirExeFullPath, _dirExeHomeDir, "TaiJiMPC5")
-    if hasExe6 then
-        installx.FilePathCreateShortCut(startMenuDir .. "\\Programs\\TaijiControl\\TaiJiMPC6.lnk", _dirExe6FullPath, _dirExe6HomeDir, "TaiJiMPC6")
-    end
+    installx.FilePathCreateShortCut(startMenuDir .. "\\Programs\\TaijiControl\\TaiJiMPC6.lnk", _dirExeFullPath, _dirExeHomeDir, "TaiJiMPC6")
 
 	local percent = 98
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
@@ -324,14 +411,14 @@ function PostSetup()
 	local percent = 99
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
 
-    local UNINST_KEY = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "TaiJiMPC5")
-    UNINST_KEY = UNINST_KEY .. "\\TaiJiMPC5"
+    -- The first RegSetValue below creates the TaiJiMPC6 key.
+    local UNINST_KEY = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\TaiJiMPC6"
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayIcon", _dirExeFullPath)
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayName", "Tai-Ji MPC5")
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayName", "Tai-Ji MPC6")
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "DisplayVersion", _VERSION)
     installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "Publisher", "Tai-Ji Soft")
-    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "UninstallString", _dirCompany .. "\\TaiJiMPC5\\UnInstall.exe")
+    -- build_TaijiMPC6.py puts UnInstall.exe into TaijiMPC6\ of Win32.7z.
+    installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, UNINST_KEY, "UninstallString", _dirExeHomeDir .. "\\UnInstall.exe")
 
 	local percent = 100
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )

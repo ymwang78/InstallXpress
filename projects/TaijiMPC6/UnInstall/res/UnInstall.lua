@@ -5,18 +5,18 @@
 --   OnInitialize()  -- when the window is ready
 --   PreSetup()      -- after the user confirms, on the worker thread
 -- and afterwards recursively deletes the directory the running UnInstall.exe
--- lives in (e.g. <InstallPath>\TaiJiMPC5) and self-deletes it.
+-- lives in (e.g. <InstallPath>\TaiJiMPC6) and self-deletes it.
 --
 -- Therefore PreSetup() performs all product-specific cleanup (stopping
 -- services, unregistering COM servers, removing registry keys / shortcuts and
 -- deleting every *other* install sub-directory). It is the reverse of
--- projects/TaijiMPC/Install/Install.lua.
+-- projects/TaijiMPC6/Install/Install.lua.
 
 local DEFAULT_INSTALL_PATH = "C:\\TaijiControl"
 
 local _dirCompany = DEFAULT_INSTALL_PATH
 -- The directory that holds the running UnInstall.exe; the native host removes it.
-local _dirExeHome = _dirCompany .. "\\TaiJiMPC5"
+local _dirExeHome = _dirCompany .. "\\TaiJiMPC6"
 
 local _strResourceCN = {
     SETUP        = "泰极MPC卸载程序",
@@ -35,7 +35,7 @@ local function resetInstallPath(installPath)
         installPath = DEFAULT_INSTALL_PATH
     end
     _dirCompany = installPath
-    _dirExeHome = _dirCompany .. "\\TaiJiMPC5"
+    _dirExeHome = _dirCompany .. "\\TaiJiMPC6"
 end
 
 local function deleteIfExists(path)
@@ -130,13 +130,17 @@ function PreSetup()
     installx.RegDeleteKey(HRootKey.HKEY_LOCAL_MACHINE,
         "SOFTWARE\\Classes\\WOW6432Node\\CLSID", "{A48A6241-A024-4f99-B105-5DF8CCEA66BA}")
 
-    -- 7. Remove all product registry trees (InstallPath / TaiJiMPC5 / PythonEnv).
+    -- 7. Remove all product registry trees (InstallPath / TaiJiMPC6 / PythonEnv).
     installx.RegDeleteKey(HRootKey.HKEY_LOCAL_MACHINE, "Software", "TaijiControl")
     installx.RegDeleteKey(HRootKey.HKEY_LOCAL_MACHINE, "Software\\WOW6432Node", "TaijiControl")
 
-    -- 8. Remove autostart entry and the Add/Remove-Programs uninstall entry.
+    -- 8. Remove autostart entry and the Add/Remove-Programs uninstall entry. The TaiJiMPC5 entry is
+    --    left over from the earlier combined TaiJiMPC5 + TaiJiMPC6 packages; the shared directories it
+    --    depends on are deleted below, so it goes too.
     installx.RegDeleteValue(HRootKey.HKEY_LOCAL_MACHINE,
         "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", "TaijiMPC")
+    installx.RegDeleteKey(HRootKey.HKEY_LOCAL_MACHINE,
+        "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall", "TaiJiMPC6")
     installx.RegDeleteKey(HRootKey.HKEY_LOCAL_MACHINE,
         "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall", "TaiJiMPC5")
 
@@ -145,7 +149,7 @@ function PreSetup()
     installx.RegDeleteValue(HRootKey.HKEY_LOCAL_MACHINE,
         "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment", "PYTHONHOME")
 
-    -- 10. Remove desktop and start-menu shortcuts.
+    -- 10. Remove desktop and start-menu shortcuts (TaiJiMPC5.lnk is left over from the combined packages).
     local desktopDir = installx.FilePathGetSpecialLocation(CSIDL.COMMON_DESKTOPDIRECTORY)
     deleteIfExists(desktopDir .. "\\TaiJiMPC5.lnk")
     deleteIfExists(desktopDir .. "\\TaiJiMPC6.lnk")
@@ -155,7 +159,8 @@ function PreSetup()
 
     -- 11. Delete every install sub-directory except the one the running
     --      UnInstall.exe lives in (_dirExeHome); the native host removes that one.
-    deleteIfExists(_dirCompany .. "\\TaiJiMPC6")
+    --      TaiJiMPC5 is the client left over from the combined packages.
+    deleteIfExists(_dirCompany .. "\\TaiJiMPC5")
     deleteIfExists(_dirCompany .. "\\WinPy313")
     deleteIfExists(_dirCompany .. "\\Win32")
     deleteIfExists(_dirCompany .. "\\TaiJiDataSvc")

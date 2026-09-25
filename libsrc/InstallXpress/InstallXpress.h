@@ -46,6 +46,8 @@ extern "C" {
         int       nResourceIDIcon;
         int       nResourceIDLua;
         bool      bSilentInstall;
+        // Set by the installer window when setup fails; InstallXpress_WinMain then returns 1.
+        bool      bInstallFailed;
     };
 
     int InstallXpress_WinMain(InstallXpress_Init_t* init_t);

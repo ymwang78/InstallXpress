@@ -95,7 +95,8 @@ Demo installers are under `projects/` and need their binary `.7z` resources pres
 ### Registry
 | Function | Description |
 |----------|-------------|
-| `RegGetValue(root, path, key)` | Read registry value |
+| `RegGetValue(root, path, key)` | Read registry value; `key=""` only tests that the key exists |
+| `RegGetDefaultValue(root, path)` | Read a key's default value (REG_SZ/REG_DWORD), nil if missing |
 | `RegSetValue(root, path, key, value)` | Write registry value |
 | `RegDeleteValue(root, path, key)` | Delete value |
 | `RegDeleteKey(root, path, key)` | Delete key tree |
