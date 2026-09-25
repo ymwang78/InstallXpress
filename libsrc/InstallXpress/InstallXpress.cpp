@@ -348,5 +348,6 @@ int InstallXpress_WinMain(InstallXpress_Init_t* init_t)
 
     ::OleUninitialize();
     ::CoUninitialize();
-    return 0;
+    // A silent install (/s) has no UI, so the exit code is how its caller learns about a failure.
+    return init_t->bInstallFailed ? 1 : 0;
 }

@@ -49,6 +49,7 @@ public:
 	void InstallZipParallel(const std::vector<ResourceHandler*>& resources, const std::vector<UINT>& resourceIDs, const std::wstring& strUnzipDir, const std::vector<std::wstring>& skipPrefixes);
 	void InstallZipParallel(const std::vector<ResourceHandler*>& resources, const std::vector<InstallXpress_UnzipJob>& jobs);
 	void SplitStringW(const WCHAR *pSrc, WCHAR chMark, std::vector<std::wstring> &vecStrings, BOOL bOnce);
+	void OnInstallFailed(const char* stage);
 	
 public:
 	static	unsigned int _stdcall InstallThread(void* param);

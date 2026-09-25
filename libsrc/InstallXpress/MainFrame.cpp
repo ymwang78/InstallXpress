@@ -172,15 +172,25 @@ LRESULT CMainFrame::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 	return WindowImplBase::HandleMessage(uMsg, wParam, lParam);
 }
 
+// Setup cannot complete: stay on the progress page with the close button enabled, and record the
+// failure so InstallXpress_WinMain returns a non-zero exit code. A silent install has nobody to
+// click close, so it quits right away instead of waiting forever.
+void CMainFrame::OnInstallFailed(const char* stage)
+{
+    APPLOG(Log::LOG_ERROR)("Installation failed %s\n", stage);
+    m_pInit->bInstallFailed = true;
+    if (m_pProgress) m_pProgress->SetText(_T("安装失败"));
+    if (m_pCloseBtn) m_pCloseBtn->SetEnabled(true);
+    if (m_pInit->bSilentInstall) PostMessage(WM_CLOSE, 0, 0);
+}
+
 LRESULT CMainFrame::HandleCustomMessage(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled)
 {
 	if (WM_INSTALLPROGRES_MSG == uMsg) {
         int nNotifyID = (int)wParam;
         if (lParam == (LPARAM)-2) {
             // Parallel extraction failed
-            APPLOG(Log::LOG_ERROR)("Installation failed during extraction\n");
-            if (m_pProgress) m_pProgress->SetText(_T("安装失败"));
-            if (m_pCloseBtn) m_pCloseBtn->SetEnabled(true);
+            OnInstallFailed("during extraction");
             bHandled = TRUE;
         }
         else if (lParam != (LPARAM)-1) {
@@ -192,12 +202,9 @@ LRESULT CMainFrame::HandleCustomMessage(UINT uMsg, WPARAM wParam, LPARAM lParam,
         else {
             m_luaPtr->OnUnzipProgress(nNotifyID, -1, -1, -1, -1);
             if (!m_luaPtr->PostSetup()) {
-                // The script reported that setup cannot complete: stay on the progress page instead
-                // of playing the finish animation, so the installer does not claim success.
-                APPLOG(Log::LOG_ERROR)("Installation failed in PostSetup\n");
-                if (m_pProgress) m_pProgress->SetText(_T("安装失败"));
-                if (m_pCloseBtn) m_pCloseBtn->SetEnabled(true);
-                if (m_pInit->bSilentInstall) PostMessage(WM_CLOSE, 0, 0);
+                // The script reported that setup cannot complete: no finish animation, so the
+                // installer does not claim success.
+                OnInstallFailed("in PostSetup");
             }
             else if (m_pInit->bSilentInstall) {
                 APPLOG(Log::LOG_TRACE)("Silent install completed; closing installer\n");
