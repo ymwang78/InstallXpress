@@ -243,6 +243,44 @@ function StartSetup()
 	installx.FilePathUnzip(resourceIDs, _dirCompany, skipPrefixes)
 end
 
+-- OPC core components come in two Graybox packages, one per bitness, and each carries what the
+-- other lacks:
+--   x86: OpcEnum.exe (the OPC server browser, which only exists as 32-bit) and the 32-bit
+--        proxy/stubs. Needed by the 32-bit DA servers TaiJiOPCSim and TaiJiPYSim\opcserver_win_i386,
+--        and by every client that browses servers through OpcEnum.
+--   x64: the 64-bit proxy/stubs only. Needed by HostVM's DA client (libidh, x64) to talk to DA
+--        servers and to the 32-bit OpcEnum.
+-- Each package is checked on its own, so a machine where other OPC software already installed the
+-- 32-bit half still gets the 64-bit half.
+local OPC_IID_IOPCSERVER = "{39C13A4D-011E-11D0-9675-0020AFD8ADB3}"       -- proxy/stub in opcproxy.dll
+local OPC_IID_IOPCSERVERLIST = "{13486D50-4821-11D2-A494-3CB306C10000}"   -- proxy/stub in opccomn_ps.dll
+local OPC_CLSID_OPCSERVERLIST = "{13486D51-4821-11D2-A494-3CB306C10000}"  -- OpcEnum.exe
+
+local function RegKeyHasDefault(path)
+    local value = installx.RegGetValue(HRootKey.HKEY_CLASSES_ROOT, path, "")
+    return value ~= nil and value ~= ""
+end
+
+-- True when COM can marshal the OPC interfaces in the given registry view ("" or "WOW6432Node\\").
+local function OpcProxiesRegistered(view)
+    return RegKeyHasDefault(view .. "Interface\\" .. OPC_IID_IOPCSERVER .. "\\ProxyStubClsid32")
+        and RegKeyHasDefault(view .. "Interface\\" .. OPC_IID_IOPCSERVERLIST .. "\\ProxyStubClsid32")
+end
+
+function InstallOpcCoreComponents()
+    local opcDir = _dirCompany .. "\\Common\\opc\\"
+    if OpcProxiesRegistered("WOW6432Node\\") and RegKeyHasDefault("WOW6432Node\\CLSID\\" .. OPC_CLSID_OPCSERVERLIST) then
+        installx.LogPrint("Skip OPC core components x86, already registered")
+    else
+        installx.ProcessExecute("\"" .. opcDir .. "GBDA_Install_Prereq_x86.msi\" /quiet")
+    end
+    if OpcProxiesRegistered("") then
+        installx.LogPrint("Skip OPC core components x64, already registered")
+    else
+        installx.ProcessExecute("\"" .. opcDir .. "GBDA_Install_Prereq_x64.msi\" /quiet")
+    end
+end
+
 function PostSetup()
 
 	local percent = 94
@@ -254,12 +292,7 @@ function PostSetup()
 
 	local percent = 95
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
-    local opcEnum = installx.RegGetValue(HRootKey.HKEY_CLASSES_ROOT, "WOW6432Node\\CLSID\\{13486D50-4821-11D2-A494-3CB306C10000}", "")
-    -- local opcEnum = installx.RegGetValue(HRootKey.HKEY_CLASSES_ROOT, "CLSID\\{13486D50-4821-11D2-A494-3CB306C10000}", "")
-    if (opcEnum == nil or opcEnum == False) then
-        installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\opc\\GBDA_Install_Prereq_x86.msi\" /quiet")
-        installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\opc\\GBDA_Install_Prereq_x64.msi\" /quiet")
-    end
+    InstallOpcCoreComponents()
 
 	local percent = 96
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
