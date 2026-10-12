@@ -253,14 +253,52 @@ function InstallHostVMConfig()
         installx.LogPrint("Keep existing HostVM config: " .. siteConfig)
         return true
     end
-    -- FilePathCopy passes its third argument to CopyFile as bFailIfExists, so it is not relied on
-    -- here; the existence check above is what keeps a site config from being overwritten.
-    if installx.FilePathCopy(defaultConfig, siteConfig) then
+    -- CopyFile bFailIfExists also protects a config created after the existence check.
+    if installx.FilePathCopy(defaultConfig, siteConfig, true) then
         installx.LogPrint("Created HostVM config from " .. defaultConfig)
         return true
     end
     ErrorHint(_strResource.HOSTVM_CONFIG_FAILED .. siteConfig)
     return false
+end
+
+-- Templates never overwrite site XML. Any XML (including another product's) disables seeding.
+function InstallHostVMFragments()
+    local directory = _dirCompany .. "\\HostVM\\hostvm.d"
+    local files, errorCode = installx.FilePathListFiles(directory)
+    if files == nil then
+        installx.LogPrint("Cannot enumerate HostVM fragments: ", errorCode)
+        ErrorHint(_strResource.HOSTVM_CONFIG_FAILED .. directory)
+        return false
+    end
+    for _, name in ipairs(files) do
+        if name:lower():match("%.xml$") then
+            installx.LogPrint("Keep existing HostVM fragments: " .. directory)
+            return true
+        end
+    end
+    table.sort(files)
+    local created = {}
+    for _, name in ipairs(files) do
+        if name:lower():match("^1%d%d%-.*%.xml%.template$") then
+            local destination = directory .. "\\" .. name:sub(1, -10)
+            -- Third argument is CopyFile's bFailIfExists: never overwrite, even on a race.
+            if not installx.FilePathCopy(directory .. "\\" .. name, destination, true) then
+                -- Roll back this attempt so a retry does not mistake partial seeding for site config.
+                for _, path in ipairs(created) do
+                    installx.FilePathDelete(path)
+                end
+                ErrorHint(_strResource.HOSTVM_CONFIG_FAILED .. destination)
+                return false
+            end
+            table.insert(created, destination)
+        end
+    end
+    if #created == 0 then
+        ErrorHint(_strResource.HOSTVM_CONFIG_FAILED .. directory)
+        return false
+    end
+    return true
 end
 
 -- OPC core components come in two Graybox packages, one per bitness, and each carries what the
@@ -343,7 +381,7 @@ function PostSetup()
 
     -- Without hostvm.xml the HostVM service cannot start. Checking it first means a failure stops
     -- before any runtime, service, registry or shortcut is touched.
-    if not InstallHostVMConfig() then
+    if not InstallHostVMConfig() or not InstallHostVMFragments() then
         return false
     end
 

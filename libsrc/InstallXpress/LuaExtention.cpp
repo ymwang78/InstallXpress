@@ -594,6 +594,42 @@ static int l_FilePathExists(lua_State * L)
     return 1;
 }
 
+// Returns immediate file names, or nil plus a Win32 error on enumeration failure.
+static int l_FilePathListFiles(lua_State* L)
+{
+    std::wstring directory = Utf82Unicode(luaL_checkstring(L, 1));
+    std::wstring pattern = directory + L"\\*";
+    WIN32_FIND_DATAW entry = {};
+    HANDLE search = FindFirstFileW(pattern.c_str(), &entry);
+    if (search == INVALID_HANDLE_VALUE) {
+        DWORD error = GetLastError();
+        if (error == ERROR_FILE_NOT_FOUND) {
+            lua_newtable(L);
+            return 1;
+        }
+        lua_pushnil(L);
+        lua_pushinteger(L, error);
+        return 2;
+    }
+    lua_newtable(L);
+    int index = 1;
+    do {
+        if (!(entry.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+            lua_pushstring(L, UnicodeToUtf8(entry.cFileName).c_str());
+            lua_rawseti(L, -2, index++);
+        }
+    } while (FindNextFileW(search, &entry));
+    DWORD error = GetLastError();
+    FindClose(search);
+    if (error != ERROR_NO_MORE_FILES) {
+        lua_pop(L, 1);
+        lua_pushnil(L);
+        lua_pushinteger(L, error);
+        return 2;
+    }
+    return 1;
+}
+
 extern "C"
 static int l_FilePathGetSpecialLocation(lua_State * L)
 {
@@ -1382,6 +1418,7 @@ static const luaL_Reg reglib[] = {
     {"FilePathCopy", l_FilePathCopy},
     {"FilePathDelete", l_FilePathDelete},
     {"FilePathExists", l_FilePathExists},
+    {"FilePathListFiles", l_FilePathListFiles},
     {"FilePathGetSpecialLocation", l_FilePathGetSpecialLocation},
     {"FilePathMkdir", l_FilePathMakeDir},
     {"FilePathSaveResource", l_FilePathSaveResource},
