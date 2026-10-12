@@ -253,14 +253,108 @@ function InstallHostVMConfig()
         installx.LogPrint("Keep existing HostVM config: " .. siteConfig)
         return true
     end
-    -- FilePathCopy passes its third argument to CopyFile as bFailIfExists, so it is not relied on
-    -- here; the existence check above is what keeps a site config from being overwritten.
-    if installx.FilePathCopy(defaultConfig, siteConfig) then
+    -- CopyFile bFailIfExists also protects a config created after the existence check.
+    if installx.FilePathCopy(defaultConfig, siteConfig, true) then
         installx.LogPrint("Created HostVM config from " .. defaultConfig)
         return true
     end
     ErrorHint(_strResource.HOSTVM_CONFIG_FAILED .. siteConfig)
     return false
+end
+
+-- Templates never overwrite site XML. A pending marker prevents incomplete copies from
+-- being accepted as site configuration after a crash or a failed rollback.
+function InstallHostVMFragments()
+    local directory = _dirCompany .. "\\HostVM\\hostvm.d"
+    local pending = directory .. "\\.hostvm-fragments.pending"
+    local function failed(path)
+        ErrorHint(_strResource.HOSTVM_CONFIG_FAILED .. path)
+        return false
+    end
+    if installx.FilePathExists(pending) then
+        installx.LogPrint("Incomplete HostVM initialization. Recover generated XML before removing " .. pending)
+        return failed(pending)
+    end
+    local files, errorCode = installx.FilePathListFiles(directory)
+    if files == nil then
+        installx.LogPrint("Cannot enumerate HostVM fragments: ", errorCode)
+        return failed(directory)
+    end
+    for _, name in ipairs(files) do
+        if name:lower():match("%.xml$") then
+            installx.LogPrint("Keep existing HostVM fragments: " .. directory)
+            return true
+        end
+    end
+    local siteNames = installx.HostVMSubvmNames(_dirCompany .. "\\HostVM\\hostvm.xml", false)
+    if siteNames == nil then return failed("hostvm.xml") end
+    local existing = {}
+    for _, name in ipairs(siteNames) do existing[name] = true end
+    table.sort(files)
+    local selected, templateCount, planned = {}, 0, {}
+    for _, name in ipairs(files) do
+        if name:lower():match("^1%d%d%-.*%.xml%.template$") then
+            templateCount = templateCount + 1
+            local names = installx.HostVMSubvmNames(directory .. "\\" .. name, true)
+            if names == nil or #names == 0 then return failed(name) end
+            local overlaps = 0
+            for _, vmname in ipairs(names) do
+                if existing[vmname] then overlaps = overlaps + 1 end
+            end
+            if overlaps == #names then
+                installx.LogPrint("Keep main-config declarations; skip template " .. name)
+            elseif overlaps > 0 then
+                -- Never drop the non-overlapping services or rewrite an operator's template.
+                installx.LogPrint("Template partially conflicts with hostvm.xml: " .. name)
+                return failed(name)
+            else
+                for _, vmname in ipairs(names) do
+                    if planned[vmname] then return failed(name) end
+                    planned[vmname] = true
+                end
+                table.insert(selected, name)
+            end
+        end
+    end
+    if templateCount == 0 then return failed(directory) end
+    if #selected == 0 then return true end
+    if not installx.FilePathCreateDirectory(pending) then return failed(pending) end
+    local created = {}
+    for _, name in ipairs(selected) do
+        local destination = directory .. "\\" .. name:sub(1, -10)
+        local ok, copyError = installx.FilePathCopy(directory .. "\\" .. name, destination, true)
+        if not ok then
+            -- CopyFile can leave a partial destination. Do not delete a concurrent writer's
+            -- existing file when bFailIfExists reports ERROR_FILE_EXISTS/ALREADY_EXISTS.
+            if copyError ~= 80 and copyError ~= 183 then
+                table.insert(created, destination)
+            end
+            local clean = copyError ~= 80 and copyError ~= 183
+            for _, path in ipairs(created) do
+                if installx.FilePathExists(path) and not installx.FilePathDelete(path) then
+                    clean = false
+                    installx.LogPrint("HostVM rollback could not delete " .. path)
+                end
+            end
+            -- A raced-in XML is not ours to delete, but it must not make a retry
+            -- accept this interrupted initialization as a complete site configuration.
+            local remaining = installx.FilePathListFiles(directory)
+            if remaining == nil then
+                clean = false
+            else
+                for _, filename in ipairs(remaining) do
+                    if filename:lower():match("%.xml$") then clean = false end
+                end
+            end
+            if clean and not installx.FilePathDelete(pending) then
+                installx.LogPrint("HostVM rollback marker retained: " .. pending)
+            end
+            return failed(destination)
+        end
+        table.insert(created, destination)
+    end
+    if not installx.FilePathDelete(pending) then return failed(pending) end
+    return true
 end
 
 -- OPC core components come in two Graybox packages, one per bitness, and each carries what the
@@ -343,7 +437,7 @@ function PostSetup()
 
     -- Without hostvm.xml the HostVM service cannot start. Checking it first means a failure stops
     -- before any runtime, service, registry or shortcut is touched.
-    if not InstallHostVMConfig() then
+    if not InstallHostVMConfig() or not InstallHostVMFragments() then
         return false
     end
 

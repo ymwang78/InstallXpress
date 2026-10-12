@@ -4,6 +4,7 @@
 #pragma comment(lib, "Wininet.lib")
 #include "Utility/TypeConvertUtil.h"
 #include "LuaExtention.h"
+#include "HostVMConfig.h"
 #include <ShlObj_core.h>
 #include <sstream>
 #include <iostream>
@@ -538,8 +539,10 @@ extern "C" static int l_FilePathCopy(lua_State* L) {
         return 1;
     }
     BOOL ret = CopyFile(Utf82Unicode(srcPath).c_str(), Utf82Unicode(destPath).c_str(), overwrite);
+    DWORD error = ret ? ERROR_SUCCESS : GetLastError();
     lua_pushboolean(L, ret);
-    return 1;
+    lua_pushinteger(L, error);
+    return 2;
 }
 
 extern "C"
@@ -591,6 +594,68 @@ static int l_FilePathExists(lua_State * L)
         return 1;
     }
     lua_pushboolean(L, true);
+    return 1;
+}
+
+static int l_HostVMSubvmNames(lua_State* L)
+{
+    std::wstring path = Utf82Unicode(luaL_checkstring(L, 1));
+    const wchar_t* root = lua_toboolean(L, 2) ? L"hostvm_fragment" : L"hostvm_server";
+    std::vector<std::wstring> names;
+    if (!readHostVMSubvmNames(path, root, names)) {
+        lua_pushnil(L);
+        return 1;
+    }
+    lua_newtable(L);
+    int index = 1;
+    for (const auto& name : names) {
+        lua_pushstring(L, UnicodeToUtf8(name).c_str());
+        lua_rawseti(L, -2, index++);
+    }
+    return 1;
+}
+
+// Unlike recursive FilePathMkdir, this fails if another initialization already owns the marker.
+static int l_FilePathCreateDirectory(lua_State* L)
+{
+    BOOL result = CreateDirectoryW(Utf82Unicode(luaL_checkstring(L, 1)).c_str(), nullptr);
+    lua_pushboolean(L, result);
+    return 1;
+}
+
+// Returns immediate file names, or nil plus a Win32 error on enumeration failure.
+static int l_FilePathListFiles(lua_State* L)
+{
+    std::wstring directory = Utf82Unicode(luaL_checkstring(L, 1));
+    std::wstring pattern = directory + L"\\*";
+    WIN32_FIND_DATAW entry = {};
+    HANDLE search = FindFirstFileW(pattern.c_str(), &entry);
+    if (search == INVALID_HANDLE_VALUE) {
+        DWORD error = GetLastError();
+        if (error == ERROR_FILE_NOT_FOUND) {
+            lua_newtable(L);
+            return 1;
+        }
+        lua_pushnil(L);
+        lua_pushinteger(L, error);
+        return 2;
+    }
+    lua_newtable(L);
+    int index = 1;
+    do {
+        if (!(entry.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+            lua_pushstring(L, UnicodeToUtf8(entry.cFileName).c_str());
+            lua_rawseti(L, -2, index++);
+        }
+    } while (FindNextFileW(search, &entry));
+    DWORD error = GetLastError();
+    FindClose(search);
+    if (error != ERROR_NO_MORE_FILES) {
+        lua_pop(L, 1);
+        lua_pushnil(L);
+        lua_pushinteger(L, error);
+        return 2;
+    }
     return 1;
 }
 
@@ -1382,6 +1447,9 @@ static const luaL_Reg reglib[] = {
     {"FilePathCopy", l_FilePathCopy},
     {"FilePathDelete", l_FilePathDelete},
     {"FilePathExists", l_FilePathExists},
+    {"FilePathListFiles", l_FilePathListFiles},
+    {"HostVMSubvmNames", l_HostVMSubvmNames},
+    {"FilePathCreateDirectory", l_FilePathCreateDirectory},
     {"FilePathGetSpecialLocation", l_FilePathGetSpecialLocation},
     {"FilePathMkdir", l_FilePathMakeDir},
     {"FilePathSaveResource", l_FilePathSaveResource},
