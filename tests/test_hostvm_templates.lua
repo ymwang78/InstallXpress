@@ -80,6 +80,9 @@ assert(fs[pending]); copied = {}; check(false, 0)
 reset(); failDelete = ".hostvm-fragments.pending"; check(false, 2)
 copied = {}; check(false, 0)
 reset(); fs[pending] = "dir"; check(false, 0)
-reset(); failCopy = "120-hostpy.xml"; partial = true; copyError = 80; check(false, 1)
-assert(fs[directory .. "\\120-hostpy.xml"])
+for _, code in ipairs({80, 183}) do
+    reset(); failCopy = "120-hostpy.xml"; partial = true; copyError = code; check(false, 1)
+    assert(fs[directory .. "\\120-hostpy.xml"] and fs[pending])
+    copied = {}; check(false, 0)
+end
 print("HostVM template installer: " .. count .. " cases passed")

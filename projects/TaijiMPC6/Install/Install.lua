@@ -329,11 +329,21 @@ function InstallHostVMFragments()
             if copyError ~= 80 and copyError ~= 183 then
                 table.insert(created, destination)
             end
-            local clean = true
+            local clean = copyError ~= 80 and copyError ~= 183
             for _, path in ipairs(created) do
                 if installx.FilePathExists(path) and not installx.FilePathDelete(path) then
                     clean = false
                     installx.LogPrint("HostVM rollback could not delete " .. path)
+                end
+            end
+            -- A raced-in XML is not ours to delete, but it must not make a retry
+            -- accept this interrupted initialization as a complete site configuration.
+            local remaining = installx.FilePathListFiles(directory)
+            if remaining == nil then
+                clean = false
+            else
+                for _, filename in ipairs(remaining) do
+                    if filename:lower():match("%.xml$") then clean = false end
                 end
             end
             if clean and not installx.FilePathDelete(pending) then
