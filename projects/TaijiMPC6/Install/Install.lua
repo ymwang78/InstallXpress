@@ -262,14 +262,23 @@ function InstallHostVMConfig()
     return false
 end
 
--- Templates never overwrite site XML. Any XML (including another product's) disables seeding.
+-- Templates never overwrite site XML. A pending marker prevents incomplete copies from
+-- being accepted as site configuration after a crash or a failed rollback.
 function InstallHostVMFragments()
     local directory = _dirCompany .. "\\HostVM\\hostvm.d"
+    local pending = directory .. "\\.hostvm-fragments.pending"
+    local function failed(path)
+        ErrorHint(_strResource.HOSTVM_CONFIG_FAILED .. path)
+        return false
+    end
+    if installx.FilePathExists(pending) then
+        installx.LogPrint("Incomplete HostVM initialization. Recover generated XML before removing " .. pending)
+        return failed(pending)
+    end
     local files, errorCode = installx.FilePathListFiles(directory)
     if files == nil then
         installx.LogPrint("Cannot enumerate HostVM fragments: ", errorCode)
-        ErrorHint(_strResource.HOSTVM_CONFIG_FAILED .. directory)
-        return false
+        return failed(directory)
     end
     for _, name in ipairs(files) do
         if name:lower():match("%.xml$") then
@@ -277,27 +286,64 @@ function InstallHostVMFragments()
             return true
         end
     end
+    local siteNames = installx.HostVMSubvmNames(_dirCompany .. "\\HostVM\\hostvm.xml", false)
+    if siteNames == nil then return failed("hostvm.xml") end
+    local existing = {}
+    for _, name in ipairs(siteNames) do existing[name] = true end
     table.sort(files)
-    local created = {}
+    local selected, templateCount, planned = {}, 0, {}
     for _, name in ipairs(files) do
         if name:lower():match("^1%d%d%-.*%.xml%.template$") then
-            local destination = directory .. "\\" .. name:sub(1, -10)
-            -- Third argument is CopyFile's bFailIfExists: never overwrite, even on a race.
-            if not installx.FilePathCopy(directory .. "\\" .. name, destination, true) then
-                -- Roll back this attempt so a retry does not mistake partial seeding for site config.
-                for _, path in ipairs(created) do
-                    installx.FilePathDelete(path)
-                end
-                ErrorHint(_strResource.HOSTVM_CONFIG_FAILED .. destination)
-                return false
+            templateCount = templateCount + 1
+            local names = installx.HostVMSubvmNames(directory .. "\\" .. name, true)
+            if names == nil or #names == 0 then return failed(name) end
+            local overlaps = 0
+            for _, vmname in ipairs(names) do
+                if existing[vmname] then overlaps = overlaps + 1 end
             end
-            table.insert(created, destination)
+            if overlaps == #names then
+                installx.LogPrint("Keep main-config declarations; skip template " .. name)
+            elseif overlaps > 0 then
+                -- Never drop the non-overlapping services or rewrite an operator's template.
+                installx.LogPrint("Template partially conflicts with hostvm.xml: " .. name)
+                return failed(name)
+            else
+                for _, vmname in ipairs(names) do
+                    if planned[vmname] then return failed(name) end
+                    planned[vmname] = true
+                end
+                table.insert(selected, name)
+            end
         end
     end
-    if #created == 0 then
-        ErrorHint(_strResource.HOSTVM_CONFIG_FAILED .. directory)
-        return false
+    if templateCount == 0 then return failed(directory) end
+    if #selected == 0 then return true end
+    if not installx.FilePathCreateDirectory(pending) then return failed(pending) end
+    local created = {}
+    for _, name in ipairs(selected) do
+        local destination = directory .. "\\" .. name:sub(1, -10)
+        local ok, copyError = installx.FilePathCopy(directory .. "\\" .. name, destination, true)
+        if not ok then
+            -- CopyFile can leave a partial destination. Do not delete a concurrent writer's
+            -- existing file when bFailIfExists reports ERROR_FILE_EXISTS/ALREADY_EXISTS.
+            if copyError ~= 80 and copyError ~= 183 then
+                table.insert(created, destination)
+            end
+            local clean = true
+            for _, path in ipairs(created) do
+                if installx.FilePathExists(path) and not installx.FilePathDelete(path) then
+                    clean = false
+                    installx.LogPrint("HostVM rollback could not delete " .. path)
+                end
+            end
+            if clean and not installx.FilePathDelete(pending) then
+                installx.LogPrint("HostVM rollback marker retained: " .. pending)
+            end
+            return failed(destination)
+        end
+        table.insert(created, destination)
     end
+    if not installx.FilePathDelete(pending) then return failed(pending) end
     return true
 end
 
