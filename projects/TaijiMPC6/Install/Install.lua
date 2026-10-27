@@ -431,6 +431,53 @@ function InstallOpcCoreComponents()
     end
 end
 
+-- Version of the bundled Common\hasp\haspdinst.exe; change it together with that file. The
+-- Envelope-protected tjonlinelib DLLs need at least this Sentinel LDK run-time.
+local HASP_RUNTIME_VERSION = "10.33"
+
+-- Numeric fields of a dotted version ("10.31" -> {10, 31}), or nil when the value is not one.
+local function ParseVersion(text)
+    if type(text) ~= "string" then
+        return nil
+    end
+    local fields = {}
+    for field in (text .. "."):gmatch("([^.]*)%.") do
+        if not field:match("^%d+$") then
+            return nil
+        end
+        table.insert(fields, tonumber(field))
+    end
+    return fields
+end
+
+-- True when dotted version `version` is older than `minimum`, compared field by field as numbers
+-- (as strings, "10.31" < "8.31" and "9.12" > "10.33"). Missing trailing fields count as 0. A value
+-- that is not a dotted version, nil included, counts as older.
+local function VersionOlderThan(version, minimum)
+    local have, want = ParseVersion(version), ParseVersion(minimum)
+    if have == nil then
+        return true
+    end
+    for i = 1, math.max(#have, #want) do
+        local a, b = have[i] or 0, want[i] or 0
+        if a ~= b then
+            return a < b
+        end
+    end
+    return false
+end
+
+-- Runs haspdinst unless the installed run-time is already HASP_RUNTIME_VERSION or newer. Treating an
+-- unreadable version as too old is safe: haspdinst itself does not downgrade a newer run-time.
+function InstallHaspRuntime()
+    local installed = installx.RegGetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Aladdin Knowledge Systems\\HASP\\Driver\\Installer", "DrvPkgVersion")
+    if not VersionOlderThan(installed, HASP_RUNTIME_VERSION) then
+        installx.LogPrint("Skip Sentinel run-time, " .. installed .. " already installed")
+        return
+    end
+    installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\hasp\\haspdinst.exe\" -install -nomsg")
+end
+
 -- Returning false tells the installer that setup did not complete: it shows the failure and
 -- enables the close button instead of moving on to the finish page.
 function PostSetup()
@@ -461,10 +508,7 @@ function PostSetup()
 	installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{A48A6241-A024-4f99-B105-5DF8CCEA66BA}\\Implemented Categories\\{63D5F430-CFE4-11d1-B2C8-0060083BA1FB}", "", "")
 	installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{A48A6241-A024-4f99-B105-5DF8CCEA66BA}\\Implemented Categories\\{63D5F432-CFE4-11d1-B2C8-0060083BA1FB}", "", "")
 
-    local haspVersion = installx.RegGetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Aladdin Knowledge Systems\\HASP\\Driver\\Installer", "DrvPkgVersion")
-    if (haspVersion == nil or haspVersion < "8.31") then --os.execute
-        installx.ProcessExecute("\"" .. _dirCompany .. "\\Common\\hasp\\haspdinst.exe\" -install -nomsg")
-    end
+    InstallHaspRuntime()
 
 	RunBatchFile(_dirCompany .. "\\HostVM\\install_python_env.bat", 10)
 	if _installTaiJiDataSvc then
