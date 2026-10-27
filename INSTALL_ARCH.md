@@ -148,7 +148,7 @@ rootKey 枚举：0=HKCR, 1=HKCU, 2=HKLM, 3=HKU, 4=HKCC
             ├─ 94%  GBDA_Install_Prereq_x86.msi（OPC DA，注册表判断跳过）
             ├─ 95%  GBDA_Install_Prereq_x64.msi（OPC DA x64，注册表判断跳过）
             ├─ 96%  TaiJiOPCSim.exe -RegServer + 手动写 COM 类别注册表
-            ├─ 96%  haspdinst.exe -install（HASP 加密狗，版本 <8.31 才安装）
+            ├─ 96%  haspdinst.exe -install -nomsg（Sentinel LDK 运行时，已装版本低于 10.33 或读不到才安装）
             ├─ 96%  install_python_env.bat（Python 虚拟环境初始化）
             ├─ 97%  写注册表（InstallPath、APPPath、Version、PythonEnv）× HKLM + WOW6432Node
             ├─ 97%  创建桌面快捷方式（TaiJiMPC5.lnk、TaiJiMPC6.lnk）
@@ -320,7 +320,11 @@ HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run
 | vc_redist.x64 | `HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64` | `Installed` |
 | OPC DA x86 | `HKCR\WOW6432Node\CLSID\{13486D50-...}` | 路径存在即跳过 |
 | OPC DA x64 | `HKCR\CLSID\{13486D50-...}` | 路径存在即跳过 |
-| HASP 驱动 | `HKLM\SOFTWARE\Aladdin Knowledge Systems\HASP\Driver\Installer` | `DrvPkgVersion >= "8.31"` |
+| HASP 驱动 | `HKLM\SOFTWARE\Aladdin Knowledge Systems\HASP\Driver\Installer` | `DrvPkgVersion` 按点分逐段数值比较，>= 10.33 跳过 |
+
+Sentinel 运行时门槛是 `Install.lua` 里的 `HASP_RUNTIME_VERSION`，必须与随包的 `Common\hasp\haspdinst.exe` 版本一致，换安装器时一起改。tjonlinelib v3/v4 套了 Sentinel Envelope，需要 10.33 以上的运行时。`DrvPkgVersion` 读不到或不是点分数字时按需要安装处理；haspdinst 自己不会把更新的运行时降级（8.41 安装器在 10.31 机器上运行时，`aksdrvsetup.log` 记录 `New Version == bigger` 后没有安装）。
+
+haspdinst 10.33 的开关（`haspdinst.exe -?` 输出）：必选 `-install (i)`、`-remove (r)`、`-fremove (fr)`、`-info`、`-help (h)`；可选（仅配合 `-i`/`-r`/`-fr`）`-killprocess (kp)`、`-nomsg`、`-criticalmsg (cm)`、`-fi`、`-fss`、`-chkllm`、`-ld`；开关前缀也可以用 `/`。安装用 `-install -nomsg`，卸载（`UnInstall.lua`）用 `-r -kp -nomsg`。
 
 ---
 
