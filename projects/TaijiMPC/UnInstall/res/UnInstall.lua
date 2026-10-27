@@ -126,9 +126,14 @@ function PreSetup()
     runUninstallBatch(_dirCompany .. "\\TaijiPYSim\\uninstall_taijiopcsim.bat", 30)
     runUninstallBatch(_dirCompany .. "\\HostVM\\uninstall_python_env.bat", 10)
 
-    -- 6. Remove the custom OPC enumerator COM class created in Install.lua PostSetup.
+    -- 6. Remove TaiJiOPCSim's COM class (32-bit view) and its DCOM identity (AppID keys, shared by
+    --    both views), written by RegisterTaiJiOPCSim() in Install.lua.
     installx.RegDeleteKey(HRootKey.HKEY_LOCAL_MACHINE,
         "SOFTWARE\\Classes\\WOW6432Node\\CLSID", "{A48A6241-A024-4f99-B105-5DF8CCEA66BA}")
+    installx.RegDeleteKey(HRootKey.HKEY_LOCAL_MACHINE,
+        "SOFTWARE\\Classes\\AppID", "{A48A6241-A024-4F99-B105-5DF8CCEA66BA}")
+    installx.RegDeleteKey(HRootKey.HKEY_LOCAL_MACHINE,
+        "SOFTWARE\\Classes\\AppID", "TaiJiOPCSim.exe")
 
     -- 7. Remove all product registry trees (InstallPath / TaiJiMPC5 / PythonEnv).
     installx.RegDeleteKey(HRootKey.HKEY_LOCAL_MACHINE, "Software", "TaijiControl")
