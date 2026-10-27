@@ -1,6 +1,6 @@
 -- Run from the repository root: lua tests/test_taijiopcsim_dcom.lua
--- TaijiMPC6 Install.lua must leave HKLM as TaiJiOPCSim-InteractiveUser.reg does, and UnInstall.lua
--- must take it away again.
+-- The TaijiMPC and TaijiMPC6 Install.lua must leave HKLM as TaiJiOPCSim-InteractiveUser.reg does,
+-- and their UnInstall.lua must take it away again.
 local CLSID = "{A48A6241-A024-4F99-B105-5DF8CCEA66BA}"
 local EXE = "C:\\TaijiControl\\TaiJiOPCSim\\bin\\TaiJiOPCSim.exe"
 
@@ -57,37 +57,41 @@ local function reset(installed)
     registry, events, exists = {}, {}, {[EXE] = installed}
 end
 
-assert(loadfile("projects/TaijiMPC6/Install/Install.lua"))()
-
--- Installed: registered first, then the keys of TaiJiOPCSim-InteractiveUser.reg on top.
-reset(true)
-RegisterTaiJiOPCSim()
-assert(events[1] == "exec \"" .. EXE .. "\" -RegServer", events[1])
-assert(value("SOFTWARE\\WOW6432Node\\Classes\\CLSID\\" .. CLSID, "AppID") == CLSID)
-assert(value("SOFTWARE\\Classes\\AppID\\" .. CLSID, "") == "TaiJiOPCSim")
-assert(value("SOFTWARE\\Classes\\AppID\\" .. CLSID, "RunAs") == "Interactive User")
-assert(value("SOFTWARE\\Classes\\AppID\\TaiJiOPCSim.exe", "AppID") == CLSID)
--- AppID is a shared key: written to the 64-bit view, never under WOW6432Node.
-for key in pairs(registry) do
-    assert(not (key:find("wow6432node", 1, true) and key:find("\\appid\\", 1, true)), key)
-end
 local CATEGORIES = "SOFTWARE\\Classes\\WOW6432Node\\CLSID\\" .. CLSID .. "\\Implemented Categories\\"
-assert(value(CATEGORIES .. "{63D5F430-CFE4-11d1-B2C8-0060083BA1FB}", "") == "")
-assert(value(CATEGORIES .. "{63D5F432-CFE4-11d1-B2C8-0060083BA1FB}", "") == "")
-local written = 0
-for _ in pairs(registry) do written = written + 1 end
--- CLSID, its Implemented Categories and the two category subkeys, the two AppID keys.
-assert(written == 6, "unexpected keys written: " .. written)
+local projects = {"TaijiMPC", "TaijiMPC6"}
+for _, project in ipairs(projects) do
+    RegisterTaiJiOPCSim, PreSetup = nil, nil
+    assert(loadfile("projects/" .. project .. "/Install/Install.lua"))()
 
--- Uninstall removes every one of them.
-assert(loadfile("projects/TaijiMPC6/UnInstall/res/UnInstall.lua"))()
-PreSetup()
-local left = next(registry)
-assert(left == nil, "left behind by UnInstall.lua: " .. tostring(left))
+    -- Installed: registered first, then the keys of TaiJiOPCSim-InteractiveUser.reg on top.
+    reset(true)
+    RegisterTaiJiOPCSim()
+    assert(events[1] == "exec \"" .. EXE .. "\" -RegServer", project .. ": " .. tostring(events[1]))
+    assert(value("SOFTWARE\\WOW6432Node\\Classes\\CLSID\\" .. CLSID, "AppID") == CLSID, project)
+    assert(value("SOFTWARE\\Classes\\AppID\\" .. CLSID, "") == "TaiJiOPCSim", project)
+    assert(value("SOFTWARE\\Classes\\AppID\\" .. CLSID, "RunAs") == "Interactive User", project)
+    assert(value("SOFTWARE\\Classes\\AppID\\TaiJiOPCSim.exe", "AppID") == CLSID, project)
+    -- AppID is a shared key: written to the 64-bit view, never under WOW6432Node.
+    for key in pairs(registry) do
+        assert(not (key:find("wow6432node", 1, true) and key:find("\\appid\\", 1, true)), project .. ": " .. key)
+    end
+    assert(value(CATEGORIES .. "{63D5F430-CFE4-11d1-B2C8-0060083BA1FB}", "") == "", project)
+    assert(value(CATEGORIES .. "{63D5F432-CFE4-11d1-B2C8-0060083BA1FB}", "") == "", project)
+    local written = 0
+    for _ in pairs(registry) do written = written + 1 end
+    -- CLSID, its Implemented Categories and the two category subkeys, the two AppID keys.
+    assert(written == 6, project .. ": unexpected keys written: " .. written)
 
--- Not installed: no registration, no keys pointing at a missing exe.
-reset(false)
-RegisterTaiJiOPCSim()
-assert(#events == 0, events[1])
+    -- Uninstall removes every one of them.
+    assert(loadfile("projects/" .. project .. "/UnInstall/res/UnInstall.lua"))()
+    PreSetup()
+    local left = next(registry)
+    assert(left == nil, project .. ": left behind by UnInstall.lua: " .. tostring(left))
 
-print("TaiJiOPCSim DCOM identity: install and uninstall cases passed")
+    -- Not installed: no registration, no keys pointing at a missing exe.
+    reset(false)
+    RegisterTaiJiOPCSim()
+    assert(#events == 0, project .. ": " .. tostring(events[1]))
+end
+
+print("TaiJiOPCSim DCOM identity: install and uninstall cases passed for " .. table.concat(projects, ", "))

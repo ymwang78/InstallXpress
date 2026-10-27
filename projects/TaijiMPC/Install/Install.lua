@@ -317,6 +317,36 @@ function InstallOpcCoreComponents()
     end
 end
 
+-- TaiJi.OPC.Sim, the 32-bit DA server TaiJiOPCSim.exe. Its CLSID is in the 32-bit registry view;
+-- AppID keys are shared by both views, so they are written without WOW6432Node.
+local TAIJIOPCSIM_CLSID = "{A48A6241-A024-4F99-B105-5DF8CCEA66BA}"
+
+-- Registers TaiJiOPCSim.exe and runs it as the Interactive User. With the default DCOM identity (the
+-- launching user) HostVM, a SYSTEM service, gets its own TaiJiOPCSim.exe in session 0 that desktop
+-- OPC tools cannot see; as the Interactive User every client shares the one in the console session.
+-- The flip side: with nobody logged on, activation fails. Skipped when TaiJiOPCSim is not installed,
+-- so no COM keys point at a missing exe. UnInstall.lua deletes the same keys.
+function RegisterTaiJiOPCSim()
+    local exe = _dirCompany .. "\\TaiJiOPCSim\\bin\\TaiJiOPCSim.exe"
+    if not installx.FilePathExists(exe) then
+        installx.LogPrint("Skip TaiJiOPCSim registration, not installed: " .. exe)
+        return
+    end
+    installx.ProcessExecute("\"" .. exe .. "\" -RegServer", false, 10)
+
+    -- After -RegServer, which writes the CLSID key but no AppID.
+    local HKLM = HRootKey.HKEY_LOCAL_MACHINE
+    local clsidKey = "SOFTWARE\\Classes\\WOW6432Node\\CLSID\\" .. TAIJIOPCSIM_CLSID
+    local appIdKey = "SOFTWARE\\Classes\\AppID\\" .. TAIJIOPCSIM_CLSID
+    installx.RegSetValue(HKLM, clsidKey .. "\\Implemented Categories", "", "")
+    installx.RegSetValue(HKLM, clsidKey .. "\\Implemented Categories\\{63D5F430-CFE4-11d1-B2C8-0060083BA1FB}", "", "")
+    installx.RegSetValue(HKLM, clsidKey .. "\\Implemented Categories\\{63D5F432-CFE4-11d1-B2C8-0060083BA1FB}", "", "")
+    installx.RegSetValue(HKLM, clsidKey, "AppID", TAIJIOPCSIM_CLSID)
+    installx.RegSetValue(HKLM, appIdKey, "", "TaiJiOPCSim")
+    installx.RegSetValue(HKLM, appIdKey, "RunAs", "Interactive User")
+    installx.RegSetValue(HKLM, "SOFTWARE\\Classes\\AppID\\TaiJiOPCSim.exe", "AppID", TAIJIOPCSIM_CLSID)
+end
+
 -- Version of the bundled Common\hasp\haspdinst.exe; change it together with that file. The
 -- Envelope-protected tjonlinelib DLLs need at least this Sentinel LDK run-time.
 local HASP_RUNTIME_VERSION = "10.33"
@@ -380,11 +410,7 @@ function PostSetup()
 	local percent = 96
 	installx.DuiProgress("installprogress", percent, _strResource.LOADING  .. " " .. percent .. "%" )
 
-    installx.ProcessExecute("\"" .. _dirCompany .. "\\TaiJiOPCSim\\bin\\TaiJiOPCSim.exe\" -RegServer", false, 10)
-
-	installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{A48A6241-A024-4f99-B105-5DF8CCEA66BA}\\Implemented Categories", "", "")
-	installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{A48A6241-A024-4f99-B105-5DF8CCEA66BA}\\Implemented Categories\\{63D5F430-CFE4-11d1-B2C8-0060083BA1FB}", "", "")
-	installx.RegSetValue(HRootKey.HKEY_LOCAL_MACHINE, "SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{A48A6241-A024-4f99-B105-5DF8CCEA66BA}\\Implemented Categories\\{63D5F432-CFE4-11d1-B2C8-0060083BA1FB}", "", "")
+    RegisterTaiJiOPCSim()
 
     InstallHaspRuntime()
 

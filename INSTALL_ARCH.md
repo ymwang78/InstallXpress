@@ -147,7 +147,7 @@ rootKey 枚举：0=HKCR, 1=HKCU, 2=HKLM, 3=HKU, 4=HKCC
             ├─ 94%  vc_redist.x64.exe /install /quiet /norestart（注册表判断跳过）
             ├─ 94%  GBDA_Install_Prereq_x86.msi（OPC DA，注册表判断跳过）
             ├─ 95%  GBDA_Install_Prereq_x64.msi（OPC DA x64，注册表判断跳过）
-            ├─ 96%  TaiJiOPCSim.exe -RegServer + 手动写 COM 类别与 DCOM 身份（AppID，RunAs=Interactive User）注册表（TaijiMPC6；没装 TaiJiOPCSim 就跳过）
+            ├─ 96%  TaiJiOPCSim.exe -RegServer + 手动写 COM 类别与 DCOM 身份（AppID，RunAs=Interactive User）注册表（RegisterTaiJiOPCSim()；没装 TaiJiOPCSim 就跳过）
             ├─ 96%  haspdinst.exe -install -nomsg（Sentinel LDK 运行时，已装版本低于 10.33 或读不到才安装）
             ├─ 96%  install_python_env.bat（Python 虚拟环境初始化）
             ├─ 97%  写注册表（InstallPath、APPPath、Version、PythonEnv）× HKLM + WOW6432Node
