@@ -362,12 +362,24 @@ end
 -- Qt6Core.dll imports icuuc.dll, and the TaiJiMPC6\icuuc.dll in the package forwards every export to
 -- icu.dll, which Windows only has from Windows 10 1903 on (not on Server 2016/2019). Where it is
 -- missing TaiJiMPC.exe cannot start, so Common\icu's matching icu.dll and icuuc.dll go into TaiJiMPC6\.
--- Where Windows has icu.dll the client keeps using it: a copy next to the exe would shadow it.
--- UnInstall.lua removes TaiJiMPC6\ with both. Returns false when a copy fails, after showing the error.
+-- Where Windows has icu.dll the client uses it, so a TaiJiMPC6\icu.dll is removed: icu.dll is not a
+-- KnownDLL and a copy next to the exe would shadow the system one. The archive never carries it; it
+-- is left by this fallback before an OS upgrade, or was put there by hand for an earlier version.
+-- UnInstall.lua removes TaiJiMPC6\ with both. Returns false when a copy or that removal fails, after
+-- showing the error.
 local CSIDL_SYSTEM = 0x0025  -- not in install_base.lua's CSIDL table
 function InstallIcuFallback()
     local systemDir = installx.FilePathGetSpecialLocation(CSIDL_SYSTEM)
     if systemDir ~= nil and installx.FilePathExists(systemDir .. "\\icu.dll") then
+        local local_icu = _dirExeHomeDir .. "\\icu.dll"
+        if installx.FilePathExists(local_icu) then
+            -- FilePathDelete clears the read-only flag those hand-made copies tend to carry.
+            if not installx.FilePathDelete(local_icu) then
+                ErrorHint(_strResource.ICU_FAILED .. local_icu)
+                return false
+            end
+            installx.LogPrint("Removed " .. local_icu .. ", which shadowed the system icu.dll")
+        end
         installx.LogPrint("Use system ICU: " .. systemDir .. "\\icu.dll")
         return true
     end

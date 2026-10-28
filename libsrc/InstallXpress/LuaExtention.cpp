@@ -570,6 +570,11 @@ static int l_FilePathDelete(lua_State * L)
         }
     }
     else {
+        // DeleteFile refuses read-only files; clear the flag first, as DeleteDirectory does for
+        // the files it removes.
+        if (attributes & FILE_ATTRIBUTE_READONLY) {
+            SetFileAttributes(Utf82Unicode(path).c_str(), attributes & ~FILE_ATTRIBUTE_READONLY);
+        }
         if (DeleteFile(Utf82Unicode(path).c_str())) {
             lua_pushboolean(L, true);
             return 1;

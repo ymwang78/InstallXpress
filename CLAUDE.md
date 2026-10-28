@@ -77,7 +77,7 @@ Demo installers are under `projects/` and need their binary `.7z` resources pres
 |----------|-------------|
 | `FilePathExists(path)` | Check file/dir exists |
 | `FilePathMkdir(path)` | Create directories recursively |
-| `FilePathDelete(path)` | Delete file or directory |
+| `FilePathDelete(path)` | Delete file or directory; read-only files are deleted too |
 | `FilePathCopy(src, dst, overwrite)` | Copy file |
 | `FilePathChoose(title, default)` | Browse folder dialog |
 | `FilePathCreateShortCut(lnk, target, workdir, desc)` | Create shell shortcut |

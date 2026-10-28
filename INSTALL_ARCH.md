@@ -83,7 +83,7 @@ libsrc/InstallXpress/
 | `FilePathUnzip(zipPath, destDir, notifyID)` | 解压磁盘文件（异步） |
 | `FilePathExists(path)` | 路径是否存在 |
 | `FilePathMkdir(path)` | 递归创建目录 |
-| `FilePathDelete(path)` | 删除文件或目录 |
+| `FilePathDelete(path)` | 删除文件或目录；只读文件也会删掉 |
 | `FilePathCopy(src, dst, overwrite)` | 复制文件 |
 | `FilePathCreateShortCut(lnk, target, workdir, desc)` | 创建快捷方式 |
 | `FilePathGetSpecialLocation(csidl)` | 获取系统特殊目录（桌面、开始菜单等） |
@@ -144,7 +144,7 @@ rootKey 枚举：0=HKCR, 1=HKCU, 2=HKLM, 3=HKU, 4=HKCC
     │               完成后 PostMessage → HandleCustomMessage → PostSetup()
     │
     └─ PostSetup()
-            ├─      System32 没有 icu.dll 时，把 Common\icu 的 icu.dll、icuuc.dll 拷进 TaiJiMPC6\（InstallIcuFallback()；拷不进去且目标不存在就安装失败）
+            ├─      System32 没有 icu.dll 时，把 Common\icu 的 icu.dll、icuuc.dll 拷进 TaiJiMPC6\（InstallIcuFallback()；拷不进去且目标不存在就安装失败）；System32 有 icu.dll 时删掉 TaiJiMPC6\icu.dll（以前的后备或手工放的，会盖住系统那份；删不掉就安装失败）
             ├─ 94%  vc_redist.x64.exe /install /quiet /norestart（注册表判断跳过）
             ├─ 94%  GBDA_Install_Prereq_x86.msi（OPC DA，注册表判断跳过）
             ├─ 95%  GBDA_Install_Prereq_x64.msi（OPC DA x64，注册表判断跳过）
