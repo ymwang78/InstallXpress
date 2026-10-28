@@ -144,6 +144,7 @@ rootKey 枚举：0=HKCR, 1=HKCU, 2=HKLM, 3=HKU, 4=HKCC
     │               完成后 PostMessage → HandleCustomMessage → PostSetup()
     │
     └─ PostSetup()
+            ├─      System32 没有 icu.dll 时，把 Common\icu 的 icu.dll、icuuc.dll 拷进 TaiJiMPC6\（InstallIcuFallback()；拷不进去且目标不存在就安装失败）
             ├─ 94%  vc_redist.x64.exe /install /quiet /norestart（注册表判断跳过）
             ├─ 94%  GBDA_Install_Prereq_x86.msi（OPC DA，注册表判断跳过）
             ├─ 95%  GBDA_Install_Prereq_x64.msi（OPC DA x64，注册表判断跳过）

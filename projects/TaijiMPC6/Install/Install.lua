@@ -27,6 +27,7 @@ local _strResourceCN = {
 	MKDIR_FAILED = "创建目录失败: ",
 	LOADING = "正在加载",
 	HOSTVM_CONFIG_FAILED = "无法生成 HostVM 配置文件: ",
+	ICU_FAILED = "无法部署 ICU 运行库: ",
 }
 
 local _strResourceEN = {
@@ -38,6 +39,7 @@ local _strResourceEN = {
 	MKDIR_FAILED = "Make dir failed: ",
 	LOADING = "Loading",
 	HOSTVM_CONFIG_FAILED = "Failed to create the HostVM config: ",
+	ICU_FAILED = "Failed to deploy the ICU runtime: ",
 }
 
 local _strResource = _strResourceCN
@@ -357,6 +359,35 @@ function InstallHostVMFragments()
     return true
 end
 
+-- Qt6Core.dll imports icuuc.dll, and the TaiJiMPC6\icuuc.dll in the package forwards every export to
+-- icu.dll, which Windows only has from Windows 10 1903 on (not on Server 2016/2019). Where it is
+-- missing TaiJiMPC.exe cannot start, so Common\icu's matching icu.dll and icuuc.dll go into TaiJiMPC6\.
+-- Where Windows has icu.dll the client keeps using it: a copy next to the exe would shadow it.
+-- UnInstall.lua removes TaiJiMPC6\ with both. Returns false when a copy fails, after showing the error.
+local CSIDL_SYSTEM = 0x0025  -- not in install_base.lua's CSIDL table
+function InstallIcuFallback()
+    local systemDir = installx.FilePathGetSpecialLocation(CSIDL_SYSTEM)
+    if systemDir ~= nil and installx.FilePathExists(systemDir .. "\\icu.dll") then
+        installx.LogPrint("Use system ICU: " .. systemDir .. "\\icu.dll")
+        return true
+    end
+    for _, name in ipairs({"icu.dll", "icuuc.dll"}) do
+        local destination = _dirExeHomeDir .. "\\" .. name
+        -- false: overwrite, so icuuc.dll from Win32.7z is replaced by the one that matches icu.dll.
+        local ok, copyError = installx.FilePathCopy(_dirCompany .. "\\Common\\icu\\" .. name, destination, false)
+        if ok then
+            installx.LogPrint("No system icu.dll; deployed " .. destination)
+        elseif installx.FilePathExists(destination) then
+            -- E.g. a read-only icu.dll copied there by hand for an earlier version, which already worked.
+            installx.LogPrint("Keep existing " .. destination .. ", copy failed: " .. tostring(copyError))
+        else
+            ErrorHint(_strResource.ICU_FAILED .. destination)
+            return false
+        end
+    end
+    return true
+end
+
 -- OPC core components come in two Graybox packages, one per bitness, and each carries what the
 -- other lacks:
 --   x86: OpcEnum.exe (the OPC server browser, which only exists as 32-bit) and the 32-bit
@@ -515,6 +546,10 @@ function PostSetup()
     -- Without hostvm.xml the HostVM service cannot start. Checking it first means a failure stops
     -- before any runtime, service, registry or shortcut is touched.
     if not InstallHostVMConfig() or not InstallHostVMFragments() then
+        return false
+    end
+    -- Likewise for the client, which cannot start without ICU.
+    if not InstallIcuFallback() then
         return false
     end
 
